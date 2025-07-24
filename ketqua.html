@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kết quả</title>
+    <link rel="stylesheet" href="./ketqua.css">
+</head>
+<body>
+    <div id="container">
+        <div id="container-swap">
+            <h1 id="sst"><p>54</p></h1>
+            <h1 id="tinh">lào cai</h1>
+            <h2 id="huyen1"></h2>
+            <h1 id="xa1"></h1>
+            <h2 id="hinh-thuc"><p id="kl">0.05 /</p><p id="kl-kt"> 0.05 Kg / --- (cm) / <p id="htvc">Nhanh / nội miền / ttkt1</p></p></h2>
+            <div id="barcode">
+                <img id="bar-code" src="" />
+            </div>
+            <div id="qrcode">
+                <img id="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=1755709496384" alt="">
+            </div>
+            <p id="ten-sdt"><span id="ten"></span> / <span id="sdt">**********</span></p>
+            <p id="dia-chi"><span id="thon"></span>, X.<span id="xa2"></span>, <span id="huyen2"></span>, T.Lào Cai</p>
+            <p id="ghi-chu">***********</p>
+            <P id="so-hang">***********</P>
+            <P id="so-tien">*********<span id="tien"></span> đ</P>
+            <p id="cuoc"><span id="cuocd">0</span>đ</p>
+        </div>
+    </div>
+
+    <script>
+        // Lấy giá trị từ URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const Huyen = urlParams.get('chonHuyen');
+        const Xa = urlParams.get('chonXa');
+        const Thon = urlParams.get('chonThon');
+         const Ten = urlParams.get('nhapTen');
+        // const Sdt = urlParams.get('nhapSdt');
+        // const GhiChu = urlParams.get('nhapGhiChu');
+        // const Hang = urlParams.get('nhapHang');
+        // const Tien = urlParams.get('nhapTien');
+        // const Cuoc = urlParams.get('nhapCuoc');
+        const Bar = urlParams.get('barcode');
+
+
+        // Tách phần sau dấu chấm
+        const parts = Huyen.split('.');
+        const afterDot = parts[1] || "";
+        
+        // Hiển thị kết quả trên trang
+        document.getElementById('huyen1').innerText = afterDot;
+        document.getElementById('huyen2').innerText = Huyen;
+        document.getElementById('xa1').innerText = Xa;
+        document.getElementById('xa2').innerText = Xa;
+        document.getElementById('thon').innerText = Thon;
+         document.getElementById('ten').innerText = Ten;
+        // document.getElementById('sdt').innerText = Sdt;
+        // document.getElementById('ghi-chu').innerText = GhiChu;
+        // document.getElementById('so-hang').innerText = Hang;
+        // document.getElementById('tien').innerText = Tien;
+        // document.getElementById('cuocd').innerText = Cuoc;
+
+        if (Bar) {
+            // Tạo URL API với mã vạch từ trang 1
+            const barcodeUrl = `https://barcodeapi.org/api/code128/${Bar}`;
+            
+            // Cập nhật URL hình ảnh mã vạch
+            document.getElementById('bar-code').src = barcodeUrl;
+        } else {
+            // Nếu không có mã vạch trong URL
+            document.body.innerHTML = "<p>Không tìm thấy mã vạch. Vui lòng quay lại và nhập mã vạch.</p>";
+        }
+        if (Bar) {
+            // Tạo URL API với mã vạch từ trang 1
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${Bar}`;
+            
+            // Cập nhật URL hình ảnh mã vạch
+            document.getElementById('qr-code').src = qrUrl;
+        } else {
+            // Nếu không có mã vạch trong URL
+            document.body.innerHTML = "<p>Không tìm thấy mã vạch. Vui lòng quay lại và nhập mã vạch.</p>";
+        }
+    </script>
+
+</body>
+</html>

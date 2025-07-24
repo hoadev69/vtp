@@ -1,0 +1,263 @@
+:root {
+    --khoang-cach-trai: 15px;
+}
+
+#container {
+    /* width: 1200px; */
+    display: flex;
+    /* margin-top: 150px; */
+    display: flex;  
+
+}
+
+#container-swap {
+    font-family: Times New Roman;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    margin: 0;
+    background-image: url('a7.svg'); /* Đường dẫn SVG nền */
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain; /* Đảm bảo nền hiển thị đầy đủ */
+    width: 400px;
+    height: 72mm;
+    line-height: 12.5px;
+    border: solid 1px #000;
+    position: relative;
+    font-size: 10px;
+    font-weight: 500;
+    overflow: hidden;
+    margin: 2px auto auto auto;
+}
+
+#sst {
+    position: absolute;
+    top: 0;
+    right: 12px;
+    width: 25px;
+    height: 25px;
+    border: 1.5px solid black; /* Viền màu xanh */
+    border-radius: 50%; /* Bo góc 50% để tạo hình tròn */
+    box-sizing: border-box; /* Kích thước bao gồm cả viền */
+}
+
+#sst p {
+    text-align: center;
+    transform: translate(-50%, -50%);
+    position: absolute;
+    top: -4px;
+    left: 12px;
+}
+
+h1 {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 20.7px;
+    text-transform: uppercase;
+}
+
+h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 10px;
+    text-transform: uppercase;
+
+}
+
+#tinh {
+    position: absolute;
+    left: 70px;
+    top: -5px;
+}
+
+#huyen1 {
+    position: absolute;
+    left: 70px;
+    top: 22px;
+}
+
+#xa1 {
+    position: absolute;
+    left: 70px;
+    top: 45px;
+}
+
+#barcode {
+    position: absolute;
+    top: 95px;
+}
+
+/* Khối hình thức */
+    #hinh-thuc {
+        position: absolute;
+        right: var(--khoang-cach-trai);
+        top: 43px;
+        display: flex;
+        font-size: 11px;
+        margin-top: 20px;
+        display: flex;
+
+    }
+
+    #hinh-thuc #kl {
+        text-transform: none;
+        font-weight: 50;
+    }
+
+    #kl-kt {
+        text-transform: none;
+    }
+/* kết thúc */
+
+#barcode > img {
+    width: 212px;
+    height: 50px;
+}
+
+#qrcode {
+    position: absolute;
+    right: 24px;
+    top: 160px;
+}
+
+#qrcode > img { 
+    width: 65px;
+    height: 65px;
+}
+
+#ten-sdt {
+    position: absolute;
+    left: var(--khoang-cach-trai);
+    top: 144px;
+}
+
+#dia-chi {
+    position: absolute;
+    left: var(--khoang-cach-trai);
+    top: 158px;
+}
+
+#ghi-chu {
+    position: absolute;
+    left: var(--khoang-cach-trai);
+    top: 175px;
+    width: 290px;
+    white-space: nowrap;     /* Không cho phép xuống dòng */
+    overflow: hidden;        /* Ẩn phần vượt quá */
+    text-overflow: ellipsis;
+}
+
+#so-hang {
+    position: absolute;
+    left: var(--khoang-cach-trai);
+    top: 194px;
+    width: 290px;
+    white-space: nowrap;     /* Không cho phép xuống dòng */
+    overflow: hidden;        /* Ẩn phần vượt quá */
+    text-overflow: ellipsis;
+}
+
+#so-tien {
+    position: absolute;
+    left: 74px;
+    top: 209px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+#cuoc {
+    position: absolute;
+    left: 205px;
+    top: 213px;
+}
+
+@media print {
+    @page {
+        size: A7;
+        margin: 0;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        width: 74mm; /* Chiều rộng của khổ A7 */
+        height: 105mm; /* Chiều cao của khổ A7 */
+        font-size: 10pt; /* Điều chỉnh kích thước chữ nếu cần */
+    }
+
+    .container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+}
+
+@media (max-width: 768px) {
+    #tinh {
+        position: absolute;
+        left: 60px;
+        top: 8px;
+    }
+
+    #huyen1 {
+        position: absolute;
+        left: 60px;
+        top: 31px;
+    }
+
+    #xa1 {
+        position: absolute;
+        left: 58px;
+        top: 52px;
+    }
+
+    #hinh-thuc {
+        top: 49px;
+    }
+
+    #barcode {
+        top: 98px;
+    }
+
+    #qrcode {
+        right: 9px;
+        top: 155px;
+    }
+
+    #ten-sdt {
+        top: 141px;
+    }
+
+    #dia-chi {
+        top: 153px;
+    }
+
+    #ghi-chu {
+        top: 171px;
+    }
+
+    #so-hang {
+        top: 189px;
+    }
+
+    #so-tien {
+        top: 200px;
+        left: 59px;
+    }
+
+    #cuoc {
+        top: 203px;
+        left: 180px;
+    }
+    
+    
+    
+    
+}
+    

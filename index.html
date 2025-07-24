@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trang Nhập Liệu</title>
+    <link rel="stylesheet" href="./home.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Nhập Dữ Liệu</h2>
+        <form id="formSelect" action="ketqua.html" method="GET">
+            <div class="form-group">
+                <label for="huyen0">Huyện:</label>
+                <select id="huyen0" name="chonHuyen" onchange="updateSecondSelect()">
+                    <option value="TP.Lào Cai">Lào Cai</option>
+                    <option value="H.Bảo Thắng">Bảo Thắng</option>
+                </select>
+            </div>
+        
+            <div class="form-group">
+                <label for="xa0">Xã:</label>
+                <select id="xa0" name="chonXa"></select>
+            </div>
+        
+            <div class="form-group">
+                <label for="thon0">Thôn:</label>
+                <select id="thon0" name="chonThon" ></select>
+            </div>
+        
+            <div class="form-group">
+                <label for="barcodeInput">Nhập số mã vạch:</label>
+                <input type="text" id="barcodeInput" name="barcode" placeholder="Nhập mã vạch" required>
+            </div>
+        
+            <div class="form-group">
+                <label for="nhapTen">Người Nhận:</label>
+                <input type="text" id="nhapTen" name="nhapTen">
+            </div>
+        
+            <!-- <div class="form-group">
+                <label for="nhapSdt">Số điện thoại:</label>
+                <input type="number" id="nhapSdt" name="nhapSdt">
+            </div>
+            
+            <div class="form-group">
+                <label for="nhapGhiChu">Ghi chú:</label>
+                <input type="text" id="nhapGhiChu" name="nhapGhiChu">
+            </div>
+
+            <div class="form-group">
+                <label for="nhapHang">Hàng:</label>
+                <input type="text" id="nhapHang" name="nhapHang">
+            </div>
+        
+            <div class="form-group">
+                <label for="nhapTien">Tiền:</label>
+                <input type="text" id="nhapTien" name="nhapTien">
+            </div>
+        
+            <div class="form-group">
+                <label for="nhapCuoc">Cước:</label>
+                <input type="text" id="nhapCuoc" name="nhapCuoc">
+            </div> -->
+        
+            <button type="submit">Gửi</button>
+        </form>
+        
+
+        <script>
+            
+
+            function updateSecondSelect() {
+        const huyen0Value = document.getElementById('huyen0').value;
+        const xa0 = document.getElementById('xa0');
+        const thon0 = document.getElementById('thon0');
+
+        xa0.innerHTML = '';
+        thon0.innerHTML = '';
+
+        let xaOptions;
+        if (huyen0Value === 'TP.Lào Cai') {
+            xaOptions = ['Thống Nhất'];
+        } else if (huyen0Value === 'H.Bảo Thắng') {
+            xaOptions = ['Gia Phú', 'Xuân Giao', 'Phú Nhuận'];
+        } else {
+            xaOptions = [];
+        }
+
+        xaOptions.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option;
+            opt.textContent = option;
+            xa0.appendChild(opt);
+        });
+
+        xa0.addEventListener('change', updateThonSelect);
+        updateThonSelect();
+
+        function updateThonSelect() {
+            const xa0Value = xa0.value;
+            let thonOptions;
+
+            if (xa0Value === 'Gia Phú') {
+                thonOptions = ['Thôn Nậm Hẻn', 'Thôn Đông Căm', 'Thôn Hùng Thắng', 'Thôn Phú Xuân', 'Thôn Bến Phà', 'Thôn Chính Tiến', 'Thôn Soi Cờ', 'Thôn Soi Giá', 'Thôn Đồng Lục', 'Bản Bay', 'Thôn Xuân Tư'];
+            } else if (xa0Value === 'Thống Nhất') {
+                thonOptions = ['Thôn Hòa Lạc', 'Thôn Thái Bo', 'Thôn Giao Ngay', 'Thôn Giao Tiến', 'Thôn Tiến Cường', 'Thôn Tân Tiến', 'Thôn Tiến Thắng', 'Thôn Muồng', 'Thôn Chang', 'Phú Hùng', 'Thôn Mường Bát', 'Bản Cam', 'Thôn Khe Luộc', 'Thôn Kắp kẹ', 'Thôn An Thành'];
+            } else if (xa0Value === 'Xuân Giao') {
+                thonOptions = ['Thôn Chành', 'Thôn Hùng Xuân', 'Thôn Tiến Lợi', 'Thôn Giao Bình', 'Thôn Mường', 'Thôn Phẻo', 'Thôn Vàng', 'Thôn Tiến Lợi', 'Thôn Hợp Giao'];
+            } else if (xa0Value === 'Phú Nhuận') {
+                thonOptions = ['Lười chưa làm :-D'];
+            } else {
+                thonOptions = [];
+            }
+
+            thon0.innerHTML = '';
+            thonOptions.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option;
+                opt.textContent = option;
+                thon0.appendChild(opt);
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const huyen0 = document.getElementById('huyen0');
+        huyen0.value = 'TP.Lào Cai';
+        updateSecondSelect();
+    });
+
+        </script>
+</body>
+</html>

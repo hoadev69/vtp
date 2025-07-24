@@ -1,0 +1,60 @@
+form#formSelect {
+    max-width: 600px;
+    margin: auto;
+}
+
+.form-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px; /* Khoảng cách giữa các dòng */
+}
+
+.form-group label {
+    width: 30%; /* Độ rộng của label để căn chỉnh */
+    font-weight: bold;
+    margin-right: 10px; /* Khoảng cách giữa label và input */
+}
+
+.form-group input,
+.form-group select {
+    flex: 1; /* Độ rộng của input và select sẽ tự động dãn theo không gian còn lại */
+    padding: 5px;
+}
+
+button[type="submit"] {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background-color: #4CAF50;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button[type="submit"]:hover {
+    background-color: #45a049;
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    .container {
+        width: 100%;
+        padding: 0 10px;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    input[type="text"], select {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+    }
+    button {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+    }
+}
