@@ -1,0 +1,26 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node --version && npm --version$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "npm install": true,
+        "/^node -e 'const assert = require\\(\"node:assert/strict\"\\); \\(async \\(\\) => \\{ const home = await fetch\\(\"http://localhost:3000/\"\\); assert\\.equal\\(home\\.status, 200\\); assert\\.match\\(await home\\.text\\(\\), /Nhập Dữ Liệu/\\); for \\(const endpoint of \\[\"barcode\", \"qrcode\"\\]\\) \\{ const response = await fetch\\(`http://localhost:3000/api/\\$\\{endpoint\\}\\?text=VT123456`\\); assert\\.equal\\(response\\.status, 200, endpoint\\); assert\\.match\\(response\\.headers\\.get\\(\"content-type\"\\), /image\\\\/png/\\); const image = Buffer\\.from\\(await response\\.arrayBuffer\\(\\)\\); assert\\.deepEqual\\(\\[\\.\\.\\.image\\.subarray\\(0, 8\\)\\], \\[137, 80, 78, 71, 13, 10, 26, 10\\]\\); console\\.log\\(`\\$\\{endpoint\\}: PNG \\$\\{image\\.length\\} bytes`\\); \\} const invalid = await fetch\\(\"http://localhost:3000/api/qrcode\"\\); assert\\.equal\\(invalid\\.status, 400\\); console\\.log\\(\"home: OK; missing text: HTTP 400\"\\); \\}\\)\\(\\)\\.catch\\(error => \\{ console\\.error\\(error\\); process\\.exitCode = 1; \\}\\);'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check server\\.js && npm ls --depth=0$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "npm rebuild": true,
+        "/^node --check server\\.js && node --check database\\.js && node -e 'const database = require\\(\"\\./database\"\\); console\\.log\\(database\\.prepare\\(\"SELECT name FROM sqlite_master WHERE type = \\? ORDER BY name\"\\)\\.all\\(\"table\"\\)\\); database\\.close\\(\\);' && npm ls --depth=0$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check server\\.js && node --check database\\.js && node --check login\\.js && node --check admin\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

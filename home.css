@@ -3,6 +3,10 @@ form#formSelect {
     margin: auto;
 }
 
+.form-error {
+    color: #a32626;
+}
+
 .form-group {
     display: flex;
     align-items: center;

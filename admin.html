@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản trị | Theo dõi IP</title>
+    <link rel="stylesheet" href="/admin.css">
+    <script src="/admin.js" defer></script>
+</head>
+<body>
+    <header class="topbar">
+        <a href="/" class="brand">VTP <span>QUẢN TRỊ</span></a>
+        <div class="topbar-actions">
+            <span id="adminName"></span>
+            <span id="saveStatus" class="save-status" role="status" aria-live="polite"></span>
+            <button id="logoutButton" type="button">Đăng xuất</button>
+        </div>
+    </header>
+    <main>
+        <section class="page-heading">
+            <div>
+                <p class="eyebrow">THEO DÕI HOẠT ĐỘNG</p>
+                <h1>Tổng quan hệ thống</h1>
+            </div>
+            <div class="overview-metrics" aria-label="Thống kê hệ thống">
+                <div><strong id="historyCount">—</strong><span>Lượt tạo mã</span></div>
+                <div><strong id="uniqueIpCount">—</strong><span>Địa chỉ IP</span></div>
+                <div>
+                    <button id="blockedIpMetric" class="metric-button" type="button" aria-label="Hiện danh sách IP đang chặn">
+                        <strong id="blockedIpCount">—</strong>
+                        <span>IP đang chặn</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <nav class="view-tabs" role="tablist" aria-label="Khu vực quản trị">
+            <button id="historyTab" class="view-tab active" type="button" role="tab" aria-selected="true" aria-controls="historyPanel" data-tab-target="historyPanel">Lịch sử</button>
+            <button id="ipsTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="ipsPanel" data-tab-target="ipsPanel">Địa chỉ IP</button>
+            <button id="geographyTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="geographyPanel" data-tab-target="geographyPanel">Địa bàn</button>
+            <button id="fieldsTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="formFieldsPanel" data-tab-target="formFieldsPanel">Trường nhập</button>
+        </nav>
+
+        <section id="historyPanel" class="tab-panel history-section" role="tabpanel" aria-labelledby="historyTab">
+            <div class="section-heading">
+                <h2 id="historyTitle">Các mã đã tạo</h2>
+                <label class="search-field">
+                    <span>Tìm lịch sử</span>
+                    <input id="searchInput" type="search" placeholder="IP, tên gợi nhớ, mã, địa chỉ..." autocomplete="off">
+                </label>
+            </div>
+            <p id="historyError" class="error-message" role="alert" hidden></p>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>IP</th>
+                            <th>Tên gợi nhớ</th>
+                            <th>Mã đã tạo</th>
+                            <th>Huyện</th>
+                            <th>Xã</th>
+                            <th>Thôn</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyRows"></tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button id="previousPage" type="button">Trang trước</button>
+                <span id="pageLabel"></span>
+                <button id="nextPage" type="button">Trang sau</button>
+            </div>
+        </section>
+
+        <section id="ipsPanel" class="tab-panel ips-section" role="tabpanel" aria-labelledby="ipsTab" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">KIỂM SOÁT TRUY CẬP</p>
+                    <h2 id="ipsTitle">Các địa chỉ IP đã tạo mã</h2>
+                </div>
+                <div class="edit-toolbar">
+                    <button type="button" data-edit-group="ips">Sửa danh sách</button>
+                    <button type="button" class="group-save" data-group-action="save" data-group="ips" hidden>Lưu thay đổi</button>
+                    <button type="button" class="group-cancel" data-group-action="cancel" data-group="ips" hidden>Hủy</button>
+                    <button id="ipFilterToggle" type="button" hidden>Hiện tất cả IP</button>
+                </div>
+            </div>
+            <p id="ipError" class="error-message" role="alert" hidden></p>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Địa chỉ IP</th>
+                            <th>Tên gợi nhớ</th>
+                            <th>Lượt tạo mã</th>
+                            <th>Hoạt động gần nhất</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ipRows"></tbody>
+                </table>
+            </div>
+            <p class="form-hint">IP cũ chưa được ghi nhận sẽ hiển thị là “unknown” và không thể chặn theo địa chỉ.</p>
+        </section>
+
+        <section id="geographyPanel" class="tab-panel geography-section" role="tabpanel" aria-labelledby="geographyTab" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">DỮ LIỆU ĐỊA BÀN</p>
+                    <h2 id="geographyTitle">Thành phố và huyện</h2>
+                </div>
+                <div class="edit-toolbar">
+                    <button type="button" data-edit-group="geography">Sửa địa bàn</button>
+                    <button type="button" class="group-save" data-group-action="save" data-group="geography" hidden>Lưu thay đổi</button>
+                    <button type="button" class="group-cancel" data-group-action="cancel" data-group="geography" hidden>Hủy</button>
+                </div>
+            </div>
+            <p id="geographyError" class="error-message" role="alert" hidden></p>
+            <p id="geographyMessage" class="success-message" role="status" hidden></p>
+            <div id="geographyCreateForms" data-edit-form-group="geography" hidden>
+                <form id="districtForm" class="geography-form">
+                <label>Loại đơn vị
+                    <select name="kind" required>
+                        <option value="city">Thành phố</option>
+                        <option value="district">Huyện</option>
+                    </select>
+                </label>
+                <label>Tên hiển thị
+                    <input name="name" maxlength="80" placeholder="Ví dụ: TP.Lào Cai" required>
+                </label>
+                <button type="submit">Thêm thành phố/huyện</button>
+                </form>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr><th>Tên</th><th>Loại</th><th>Số xã</th><th>Hiển thị trên form</th><th>Thao tác</th></tr>
+                    </thead>
+                    <tbody id="districtRows"></tbody>
+                </table>
+            </div>
+
+            <div class="section-heading commune-heading">
+                <h2>Xã</h2>
+            </div>
+            <div class="geography-create-forms" data-edit-form-group="geography" hidden>
+            <form id="communeForm" class="geography-form">
+                <label>Thành phố/Huyện
+                    <select name="districtId" id="newCommuneDistrict" required></select>
+                </label>
+                <label>Tên xã
+                    <input name="name" maxlength="80" required>
+                </label>
+                <button type="submit">Thêm xã</button>
+            </form>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr><th>Tên xã</th><th>Thành phố/Huyện</th><th>Hiển thị trên form</th><th>Thao tác</th></tr>
+                    </thead>
+                    <tbody id="communeRows"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="formFieldsPanel" class="tab-panel form-fields-section" role="tabpanel" aria-labelledby="fieldsTab" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">TÙY CHỈNH FORM</p>
+                    <h2>Trường nhập liệu</h2>
+                </div>
+                <div class="edit-toolbar">
+                    <button type="button" data-edit-group="fields">Sửa trường</button>
+                    <button type="button" class="group-save" data-group-action="save" data-group="fields" hidden>Lưu thay đổi</button>
+                    <button type="button" class="group-cancel" data-group-action="cancel" data-group="fields" hidden>Hủy</button>
+                </div>
+            </div>
+            <p id="formFieldsError" class="error-message" role="alert" hidden></p>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr><th>Trường</th><th>Nhãn trên form</th><th>Hiển thị</th><th>Giá trị mặc định</th></tr>
+                    </thead>
+                    <tbody id="formFieldRows"></tbody>
+                </table>
+            </div>
+            <p class="form-hint">Trường đang hiện dùng giá trị mặc định làm gợi ý ban đầu. Trường bị ẩn sẽ dùng cố định giá trị mặc định khi tạo tem.</p>
+        </section>
+    </main>
+
+    <dialog id="ipHistoryDialog" class="ip-history-dialog" aria-labelledby="ipHistoryTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">LỊCH SỬ THEO IP</p>
+                <h2 id="ipHistoryTitle">Mã tạo gần đây</h2>
+                <p id="ipHistoryLabel" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeIpHistory" type="button" aria-label="Đóng lịch sử">Đóng</button>
+        </div>
+        <p id="ipHistoryError" class="error-message" role="alert" hidden></p>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr><th>Thời gian</th><th>Mã</th><th>Thành phố/Huyện</th><th>Xã</th><th>Thôn</th><th></th></tr>
+                </thead>
+                <tbody id="ipHistoryRows"></tbody>
+            </table>
+        </div>
+        <div class="pagination">
+            <button id="previousIpHistoryPage" type="button">Trang trước</button>
+            <span id="ipHistoryPageLabel"></span>
+            <button id="nextIpHistoryPage" type="button">Trang sau</button>
+        </div>
+    </dialog>
+
+    <dialog id="recreateCodeDialog" class="recreate-code-dialog" aria-labelledby="recreateCodeTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">TEM ĐÃ TẠO</p>
+                <h2 id="recreateCodeTitle">Xem và tạo lại mã</h2>
+                <p id="recreateCodeAddress" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeRecreateCode" type="button" aria-label="Đóng xem mã">Đóng</button>
+        </div>
+        <p id="recreateCodeError" class="error-message" role="alert" hidden></p>
+        <div class="code-preview">
+            <p id="recreateCodeValue" class="code-value"></p>
+            <img id="recreateBarcodeImage" alt="Mã vạch">
+            <img id="recreateQrImage" alt="Mã QR">
+        </div>
+        <dl id="recreateFieldValues" class="recreate-field-values"></dl>
+        <div class="dialog-actions">
+            <button id="confirmRecreateCode" class="primary-action" type="button">Tạo lại mã</button>
+        </div>
+    </dialog>
+</body>
+</html>

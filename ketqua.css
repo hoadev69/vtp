@@ -2,35 +2,29 @@
     --khoang-cach-trai: 15px;
 }
 
-#container {
-    /* width: 1200px; */
-    display: flex;
-    /* margin-top: 150px; */
-    display: flex;  
-
-}
+#container { display: flex; justify-content: center; }
 
 #container-swap {
-    font-family: Times New Roman;
+    font-family: "Times New Roman", serif;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 80vh;
     margin: 0;
     background-image: url('a7.svg'); /* Đường dẫn SVG nền */
     background-repeat: no-repeat;
     background-position: center;
-    background-size: contain; /* Đảm bảo nền hiển thị đầy đủ */
-    width: 400px;
-    height: 72mm;
-    line-height: 12.5px;
+    background-size: 100% 100%;
+    width: 105mm;
+    height: 74mm;
+    box-sizing: border-box;
     border: solid 1px #000;
     position: relative;
     font-size: 10px;
     font-weight: 500;
+    line-height: 12.5px;
     overflow: hidden;
-    margin: 2px auto auto auto;
+    margin: 2px auto 0;
 }
 
 #sst {
@@ -39,9 +33,30 @@
     right: 12px;
     width: 25px;
     height: 25px;
-    border: 1.5px solid black; /* Viền màu xanh */
+    border: 1.5px solid #000;
     border-radius: 50%; /* Bo góc 50% để tạo hình tròn */
     box-sizing: border-box; /* Kích thước bao gồm cả viền */
+}
+
+#print-controls {
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+}
+
+#print-button {
+    min-height: 38px;
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 3px;
+    background: #176b50;
+    color: #fff;
+    font: 600 14px Arial, sans-serif;
+    cursor: pointer;
+}
+
+#print-button:hover {
+    background: #10543e;
 }
 
 #sst p {
@@ -176,29 +191,42 @@ h2 {
 
 @media print {
     @page {
-        size: A7;
+        size: 105mm 74mm;
         margin: 0;
     }
 
+    html,
     body {
+        width: 105mm !important;
+        height: 74mm !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden;
+    }
+
+    body { display: block; font-size: 10pt; }
+    #print-controls { display: none !important; }
+    #container {
+        display: block;
+        width: 105mm;
+        height: 74mm;
         margin: 0;
         padding: 0;
-        width: 74mm; /* Chiều rộng của khổ A7 */
-        height: 105mm; /* Chiều cao của khổ A7 */
-        font-size: 10pt; /* Điều chỉnh kích thước chữ nếu cần */
     }
-
-    .container {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+    #container-swap {
+        width: 105mm;
+        height: 74mm;
+        margin: 0;
+        box-sizing: border-box;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 }
 
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
     #tinh {
         position: absolute;
         left: 60px;

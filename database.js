@@ -1,0 +1,156 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const Database = require('better-sqlite3');
+
+const dataDirectory = path.join(__dirname, 'data');
+fs.mkdirSync(dataDirectory, { recursive: true });
+
+const database = new Database(path.join(dataDirectory, 'history.sqlite'));
+database.pragma('journal_mode = WAL');
+database.pragma('foreign_keys = ON');
+database.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'operator')),
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ip_controls (
+        ip TEXT PRIMARY KEY,
+        label TEXT NOT NULL DEFAULT '',
+        blocked INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS districts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL CHECK (kind IN ('city', 'district')),
+        is_hidden INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS communes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        district_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        is_hidden INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        UNIQUE (district_id, name),
+        FOREIGN KEY (district_id) REFERENCES districts(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS form_fields (
+        field_key TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        input_type TEXT NOT NULL CHECK (input_type IN ('text', 'tel', 'number')),
+        visible INTEGER NOT NULL DEFAULT 1,
+        default_value TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+`);
+
+for (const [table, column] of [['districts', 'is_hidden'], ['communes', 'is_hidden']]) {
+    const columns = database.pragma(`table_info(${table})`);
+    if (!columns.some(item => item.name === column)) {
+        database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
+    }
+}
+
+const historyColumns = database.pragma('table_info(history)');
+if (historyColumns.length === 0) {
+    database.exec(`
+        CREATE TABLE history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT NOT NULL,
+            barcode TEXT NOT NULL,
+            district TEXT NOT NULL,
+            commune TEXT NOT NULL,
+            village TEXT NOT NULL,
+            legacy_username TEXT,
+            created_at TEXT NOT NULL
+        );
+    `);
+} else if (!historyColumns.some(column => column.name === 'ip')) {
+    const legacyHasUsername = historyColumns.some(column => column.name === 'username');
+    database.exec(`
+        DROP INDEX IF EXISTS history_created_at_idx;
+        DROP INDEX IF EXISTS history_user_id_idx;
+        ALTER TABLE history RENAME TO history_legacy;
+        CREATE TABLE history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT NOT NULL,
+            barcode TEXT NOT NULL,
+            district TEXT NOT NULL,
+            commune TEXT NOT NULL,
+            village TEXT NOT NULL,
+            legacy_username TEXT,
+            created_at TEXT NOT NULL
+        );
+        INSERT INTO history (id, ip, barcode, district, commune, village, legacy_username, created_at)
+        SELECT id, 'unknown', barcode, district, commune, village,
+            ${legacyHasUsername ? 'username' : 'NULL'}, created_at
+        FROM history_legacy;
+        DROP TABLE history_legacy;
+    `);
+}
+
+const currentHistoryColumns = database.pragma('table_info(history)');
+if (!currentHistoryColumns.some(column => column.name === 'field_values')) {
+    database.exec("ALTER TABLE history ADD COLUMN field_values TEXT NOT NULL DEFAULT '{}'");
+}
+
+database.exec(`
+    CREATE INDEX IF NOT EXISTS history_created_at_idx ON history(created_at DESC);
+    CREATE INDEX IF NOT EXISTS history_ip_idx ON history(ip);
+`);
+
+if (!database.prepare('SELECT 1 FROM app_settings WHERE key = ?').get('geography_seeded')) {
+    const seedDistrict = database.prepare(`
+        INSERT OR IGNORE INTO districts (name, kind, created_at) VALUES (?, ?, ?)
+    `);
+    const seedCommune = database.prepare(`
+        INSERT OR IGNORE INTO communes (district_id, name, created_at) VALUES (?, ?, ?)
+    `);
+    const seedGeography = database.transaction(() => {
+        const createdAt = new Date().toISOString();
+        seedDistrict.run('TP.Lào Cai', 'city', createdAt);
+        seedDistrict.run('H.Bảo Thắng', 'district', createdAt);
+
+        const cityId = database.prepare('SELECT id FROM districts WHERE name = ?').get('TP.Lào Cai').id;
+        const districtId = database.prepare('SELECT id FROM districts WHERE name = ?').get('H.Bảo Thắng').id;
+        seedCommune.run(cityId, 'Thống Nhất', createdAt);
+        seedCommune.run(districtId, 'Gia Phú', createdAt);
+        seedCommune.run(districtId, 'Xuân Giao', createdAt);
+        seedCommune.run(districtId, 'Phú Nhuận', createdAt);
+        database.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?)')
+            .run('geography_seeded', '1');
+    });
+    seedGeography();
+}
+
+    if (!database.prepare('SELECT 1 FROM app_settings WHERE key = ?').get('form_fields_seeded')) {
+        const seedFormFields = database.transaction(() => {
+            const insertField = database.prepare(`
+                INSERT OR IGNORE INTO form_fields (field_key, label, input_type, visible, default_value, sort_order)
+                VALUES (?, ?, ?, 1, '', ?)
+            `);
+            insertField.run('nhapTen', 'Người nhận', 'text', 1);
+            insertField.run('nhapSdt', 'Số điện thoại', 'tel', 2);
+            insertField.run('soHang', 'Số hàng', 'number', 3);
+            insertField.run('tenHang', 'Tên hàng', 'text', 4);
+            database.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?)')
+                .run('form_fields_seeded', '1');
+        });
+        seedFormFields();
+    }
+
+module.exports = database;

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập quản trị</title>
+    <link rel="stylesheet" href="/login.css">
+    <script src="/login.js" defer></script>
+</head>
+<body>
+    <main class="login-panel">
+        <p class="eyebrow">VTP · KHU VỰC QUẢN TRỊ</p>
+        <h1>Đăng nhập</h1>
+        <form id="loginForm">
+            <label for="username">Tên đăng nhập</label>
+            <input id="username" name="username" autocomplete="username" required>
+            <label for="password">Mật khẩu</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="submit">Đăng nhập</button>
+            <p id="loginError" role="alert" hidden></p>
+        </form>
+    </main>
+</body>
+</html>
