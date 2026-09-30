@@ -14,9 +14,9 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; background: var(--canvas); }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
-button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
     outline: 3px solid #e5ae42;
     outline-offset: 2px;
 }
@@ -83,9 +83,10 @@ h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 700; }
 }
 .history-ip-link:hover { color: var(--green) !important; }
 
-.view-tabs { display: flex; gap: 27px; height: 48px; border-bottom: 1px solid var(--line); }
+.view-tabs { display: flex; gap: 27px; height: 48px; overflow-x: auto; border-bottom: 1px solid var(--line); }
 .view-tab {
     position: relative;
+    flex: 0 0 auto;
     padding: 0 2px;
     border: 0;
     background: transparent;
@@ -184,6 +185,29 @@ button:disabled { cursor: default; opacity: .45; }
 .dialog-subtitle { margin: 0; color: var(--muted); font-size: 12px; }
 .ip-history-dialog .table-scroll { max-height: min(58vh, 560px); overflow: auto; }
 .ip-history-dialog table { min-width: 680px; }
+.inventory-day-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.inventory-day-filter button[aria-pressed="true"] { border-color: var(--green); color: #fff; background: var(--green); }
+.inventory-day-filter button[aria-pressed="true"]:hover { border-color: var(--green-dark); background: var(--green-dark); }
+.inventory-order-qr-image { display: block; width: min(280px, 100%); aspect-ratio: 1; height: auto; margin: 18px auto 4px; image-rendering: pixelated; }
+.account-dialog {
+    width: min(460px, 92vw);
+    max-width: 460px;
+    max-height: 88vh;
+    padding: 20px 22px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--ink);
+    background: #fff;
+    box-shadow: 0 18px 60px #152f2540;
+}
+.account-dialog::backdrop { background: #112c2480; }
+.account-form { display: grid; gap: 12px; }
+.account-form label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.account-form textarea { width: 100%; min-height: 100px; padding: 8px 9px; border: 1px solid #c8d5cd; border-radius: 3px; color: var(--ink); background: #fff; resize: vertical; }
+.account-form .dialog-actions { padding-top: 2px; }
+.account-form .primary-action { border-color: var(--green); color: #fff; background: var(--green); }
+.account-form .primary-action:hover { border-color: var(--green-dark); background: var(--green-dark); }
+.account-lock-reason { margin: 4px 0 0; color: var(--muted); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ip-highlight { animation: ip-highlight 1.8s ease-out; }
 @keyframes ip-highlight {
     0%, 35% { background: #d9eee1; }
@@ -239,6 +263,7 @@ button:disabled { cursor: default; opacity: .45; }
     .geography-form button { width: 100%; }
     .ip-history-dialog { padding: 16px 12px; }
     .recreate-code-dialog { padding: 16px 12px; }
+    .account-dialog { padding: 16px 12px; }
 }
 
 @media (max-width: 430px) {

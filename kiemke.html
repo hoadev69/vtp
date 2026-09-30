@@ -11,15 +11,45 @@
 <body>
     <header class="topbar">
         <a class="brand" href="/">VTP <span>KIỂM KÊ</span></a>
-        <nav aria-label="Điều hướng">
-            <a href="/">Tạo tem</a>
-            <a href="/admin">Quản trị</a>
-        </nav>
+        <div class="topbar-tools">
+            <nav aria-label="Điều hướng">
+                <a href="/">Tạo tem</a>
+                <a href="/admin">Quản trị</a>
+            </nav>
+            <div id="operatorActions" class="operator-actions" hidden>
+                <span id="operatorName" class="operator-name"></span>
+                <button id="operatorLogout" type="button">Đăng xuất</button>
+            </div>
+        </div>
     </header>
     <main>
-        <button id="createQrButton" class="clipboard-button" type="button">Lấy mã từ clipboard</button>
-        <p id="formError" class="error-message" role="alert" hidden></p>
+        <section id="operatorLoginPanel" class="operator-login-panel">
+            <p class="eyebrow">TÀI KHOẢN NHÂN VIÊN</p>
+            <h1>Đăng nhập kiểm kê</h1>
+            <form id="operatorLoginForm">
+                <label for="operatorUsername">Tên đăng nhập</label>
+                <input id="operatorUsername" name="username" type="text" minlength="3" maxlength="32" autocomplete="username" required>
+                <label for="operatorPassword">Mật khẩu</label>
+                <input id="operatorPassword" name="password" type="password" autocomplete="current-password" required>
+                <button id="operatorLoginButton" type="submit">Đăng nhập</button>
+                <p id="loginError" class="error-message" role="alert" hidden></p>
+            </form>
+        </section>
+        <section id="inventoryCreatePanel" hidden>
+            <button id="createQrButton" class="clipboard-button" type="button">Lấy mã từ clipboard</button>
+            <p id="formError" class="error-message" role="alert" hidden></p>
+        </section>
     </main>
+    <dialog id="accountLockedDialog" class="account-dialog" aria-labelledby="accountLockedTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">TÀI KHOẢN KIỂM KÊ</p>
+                <h2 id="accountLockedTitle">Tài khoản đã bị khóa</h2>
+            </div>
+            <button id="closeAccountLocked" type="button" aria-label="Đóng thông báo">Đóng</button>
+        </div>
+        <p id="accountLockedReason" class="account-lock-reason"></p>
+    </dialog>
     <dialog id="qrDialog" aria-label="Mã QR vận đơn">
         <button id="closeQrDialog" class="close-button" type="button" aria-label="Đóng">×</button>
         <img id="qrImage" alt="Mã QR">

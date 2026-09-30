@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản trị | Theo dõi IP</title>
-    <link rel="stylesheet" href="/admin.css">
-    <script src="/admin.js" defer></script>
+    <link rel="stylesheet" href="/admin.css?v=created-codes-20260930">
+    <script src="/admin.js?v=admin-village-management-20260930" defer></script>
 </head>
 <body>
     <header class="topbar">
@@ -23,7 +23,12 @@
                 <h1>Tổng quan hệ thống</h1>
             </div>
             <div class="overview-metrics" aria-label="Thống kê hệ thống">
-                <div><strong id="historyCount">—</strong><span>Lượt tạo mã</span></div>
+                <div>
+                    <button id="historyCountMetric" class="metric-button history-metric" type="button" aria-label="Hiện tất cả mã đã tạo">
+                        <strong id="historyCount">—</strong>
+                        <span>Lượt tạo mã</span>
+                    </button>
+                </div>
                 <div><strong id="uniqueIpCount">—</strong><span>Địa chỉ IP</span></div>
                 <div>
                     <button id="blockedIpMetric" class="metric-button" type="button" aria-label="Hiện danh sách IP đang chặn">
@@ -77,29 +82,60 @@
 
         <section id="inventoryPanel" class="tab-panel" role="tabpanel" aria-labelledby="inventoryTab" hidden>
             <div class="section-heading">
-                <h2>Lịch sử mã kiểm kê</h2>
-                <label class="search-field">
-                    <span>Tìm mã vận đơn hoặc IP</span>
-                    <input id="inventorySearchInput" type="search" placeholder="Mã vận đơn hoặc IP..." autocomplete="off">
-                </label>
+                <div>
+                    <p class="eyebrow">TÀI KHOẢN NHÂN VIÊN</p>
+                    <h2>Tài khoản kiểm kê</h2>
+                </div>
+                <div class="edit-toolbar">
+                    <button id="createInventoryAccountButton" class="primary-action" type="button">Tạo tài khoản</button>
+                    <label class="search-field">
+                        <span>Tìm tên đăng nhập</span>
+                        <input id="inventoryAccountSearch" type="search" placeholder="Tên đăng nhập..." autocomplete="off">
+                    </label>
+                </div>
             </div>
-            <p id="inventoryHistoryError" class="error-message" role="alert" hidden></p>
+            <p id="inventoryAccountsError" class="error-message" role="alert" hidden></p>
             <div class="table-scroll">
                 <table>
                     <thead>
-                        <tr><th>Thời gian</th><th>IP</th><th>Mã vận đơn</th></tr>
+                        <tr><th>Tên đăng nhập</th><th>Trạng thái</th><th>Ngày tạo</th><th>Mã trong 3 ngày</th><th>Hoạt động gần nhất</th><th>Thao tác</th></tr>
                     </thead>
-                    <tbody id="inventoryHistoryRows"></tbody>
+                    <tbody id="inventoryAccountRows"></tbody>
                 </table>
             </div>
             <div class="pagination">
-                <button id="previousInventoryPage" type="button">Trang trước</button>
-                <span id="inventoryPageLabel"></span>
-                <button id="nextInventoryPage" type="button">Trang sau</button>
+                <button id="previousInventoryAccountPage" type="button">Trang trước</button>
+                <span id="inventoryAccountPageLabel"></span>
+                <button id="nextInventoryAccountPage" type="button">Trang sau</button>
             </div>
         </section>
 
         <section id="ipsPanel" class="tab-panel ips-section" role="tabpanel" aria-labelledby="ipsTab" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">NHẬN DIỆN TRÌNH DUYỆT</p>
+                    <h2>Anonymous UID và các IP</h2>
+                </div>
+                <label class="search-field">
+                    <span>Tìm UID hoặc IP</span>
+                    <input id="anonymousUserSearch" type="search" placeholder="UID hoặc IP..." autocomplete="off">
+                </label>
+            </div>
+            <p id="anonymousUsersError" class="error-message" role="alert" hidden></p>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr><th>Anonymous UID</th><th>IP đã sử dụng</th><th>Sessions</th><th>Mã đã tạo</th><th>Lần đầu</th><th>Hoạt động gần nhất</th></tr>
+                    </thead>
+                    <tbody id="anonymousUserRows"></tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button id="previousAnonymousPage" type="button">Trang trước</button>
+                <span id="anonymousPageLabel"></span>
+                <button id="nextAnonymousPage" type="button">Trang sau</button>
+            </div>
+
             <div class="section-heading">
                 <div>
                     <p class="eyebrow">KIỂM SOÁT TRUY CẬP</p>
@@ -190,6 +226,29 @@
                     <tbody id="communeRows"></tbody>
                 </table>
             </div>
+
+            <div class="section-heading commune-heading">
+                <h2>Thôn</h2>
+            </div>
+            <div class="geography-create-forms" data-edit-form-group="geography" hidden>
+                <form id="villageForm" class="geography-form">
+                    <label>Xã
+                        <select name="communeId" id="newVillageCommune" required></select>
+                    </label>
+                    <label>Tên thôn
+                        <input name="name" maxlength="80" required>
+                    </label>
+                    <button type="submit">Thêm thôn</button>
+                </form>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr><th>Tên thôn</th><th>Xã</th><th>Thành phố/Huyện</th><th>Hiển thị trên form</th><th>Thao tác</th></tr>
+                    </thead>
+                    <tbody id="villageRows"></tbody>
+                </table>
+            </div>
         </section>
 
         <section id="formFieldsPanel" class="tab-panel form-fields-section" role="tabpanel" aria-labelledby="fieldsTab" hidden>
@@ -216,6 +275,146 @@
             <p class="form-hint">Trường đang hiện dùng giá trị mặc định làm gợi ý ban đầu. Trường bị ẩn sẽ dùng cố định giá trị mặc định khi tạo tem.</p>
         </section>
     </main>
+
+    <dialog id="inventoryAccountCreateDialog" class="account-dialog" aria-labelledby="inventoryAccountCreateTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">TÀI KHOẢN NHÂN VIÊN</p>
+                <h2 id="inventoryAccountCreateTitle">Tạo tài khoản kiểm kê</h2>
+            </div>
+            <button id="closeInventoryAccountCreate" type="button" aria-label="Đóng">Đóng</button>
+        </div>
+        <form id="inventoryAccountForm" class="account-form">
+            <label>Tên đăng nhập
+                <input name="username" minlength="3" maxlength="32" pattern="[a-zA-Z0-9._-]{3,32}" autocomplete="off" required>
+            </label>
+            <label>Mật khẩu tạm thời
+                <input name="password" type="password" minlength="6" maxlength="72" autocomplete="new-password" required>
+            </label>
+            <p id="inventoryAccountCreateError" class="error-message" role="alert" hidden></p>
+            <div class="dialog-actions">
+                <button class="primary-action" type="submit">Tạo tài khoản</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="lockInventoryAccountDialog" class="account-dialog" aria-labelledby="lockInventoryAccountTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">KHÓA TÀI KHOẢN</p>
+                <h2 id="lockInventoryAccountTitle">Lý do khóa</h2>
+                <p id="lockInventoryAccountUsername" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeLockInventoryAccount" type="button" aria-label="Đóng">Đóng</button>
+        </div>
+        <form id="lockInventoryAccountForm" class="account-form">
+            <label>Lý do
+                <textarea name="reason" maxlength="500" rows="4" required></textarea>
+            </label>
+            <p id="lockInventoryAccountError" class="error-message" role="alert" hidden></p>
+            <div class="dialog-actions">
+                <button class="primary-action" type="submit">Xác nhận khóa</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="resetInventoryPasswordDialog" class="account-dialog" aria-labelledby="resetInventoryPasswordTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">ĐẶT LẠI MẬT KHẨU</p>
+                <h2 id="resetInventoryPasswordTitle">Mật khẩu mới</h2>
+                <p id="resetInventoryPasswordUsername" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeResetInventoryPassword" type="button" aria-label="Đóng">Đóng</button>
+        </div>
+        <form id="resetInventoryPasswordForm" class="account-form">
+            <label>Mật khẩu mới
+                <input name="password" type="password" minlength="6" maxlength="72" autocomplete="new-password" required>
+            </label>
+            <p id="resetInventoryPasswordError" class="error-message" role="alert" hidden></p>
+            <div class="dialog-actions">
+                <button class="primary-action" type="submit">Lưu mật khẩu</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="inventoryOrdersDialog" class="ip-history-dialog" aria-labelledby="inventoryOrdersTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">LỊCH SỬ THEO TÀI KHOẢN</p>
+                <h2 id="inventoryOrdersTitle">Mã kiểm kê</h2>
+                <p id="inventoryOrdersSubtitle" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeInventoryOrders" type="button" aria-label="Đóng danh sách mã">Đóng</button>
+        </div>
+        <div id="inventoryOrdersDayFilter" class="inventory-day-filter" role="group" aria-label="Lọc theo ngày">
+            <button type="button" data-inventory-day="today" aria-pressed="true">Hôm nay</button>
+            <button type="button" data-inventory-day="yesterday" aria-pressed="false">Hôm qua</button>
+            <button type="button" data-inventory-day="two-days-ago" aria-pressed="false">Hôm kia</button>
+        </div>
+        <p id="inventoryOrdersError" class="error-message" role="alert" hidden></p>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr><th>Thời gian</th><th>IP</th><th>Mã vận đơn</th><th></th></tr>
+                </thead>
+                <tbody id="inventoryOrdersRows"></tbody>
+            </table>
+        </div>
+        <div class="pagination">
+            <button id="previousInventoryOrdersPage" type="button">Trang trước</button>
+            <span id="inventoryOrdersPageLabel"></span>
+            <button id="nextInventoryOrdersPage" type="button">Trang sau</button>
+        </div>
+    </dialog>
+
+    <dialog id="inventoryOrderQrDialog" class="recreate-code-dialog" aria-labelledby="inventoryOrderQrTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">MÃ KIỂM KÊ</p>
+                <h2 id="inventoryOrderQrTitle">QR mã vận đơn</h2>
+                <p id="inventoryOrderQrValue" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeInventoryOrderQr" type="button" aria-label="Đóng mã QR">Đóng</button>
+        </div>
+        <img id="inventoryOrderQrImage" class="inventory-order-qr-image" alt="QR mã vận đơn">
+    </dialog>
+
+    <dialog id="accountLockedDialog" class="account-dialog" aria-labelledby="accountLockedTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">TÀI KHOẢN KIỂM KÊ</p>
+                <h2 id="accountLockedTitle">Tài khoản đã bị khóa</h2>
+            </div>
+            <button id="closeAccountLocked" type="button" aria-label="Đóng thông báo">Đóng</button>
+        </div>
+        <p id="accountLockedReason" class="account-lock-reason"></p>
+    </dialog>
+
+    <dialog id="createdCodesDialog" class="ip-history-dialog" aria-labelledby="createdCodesTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">LỊCH SỬ MÃ ĐÃ TẠO</p>
+                <h2 id="createdCodesTitle">Mã tạo gần đây</h2>
+                <p id="createdCodesSubtitle" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeCreatedCodes" type="button" aria-label="Đóng lịch sử">Đóng</button>
+        </div>
+        <p id="createdCodesError" class="error-message" role="alert" hidden></p>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr><th>Thời gian</th><th>Loại</th><th>IP</th><th>Mã</th><th>Người tạo</th><th></th></tr>
+                </thead>
+                <tbody id="createdCodesRows"></tbody>
+            </table>
+        </div>
+        <div class="pagination">
+            <button id="previousCreatedCodesPage" type="button">Trang trước</button>
+            <span id="createdCodesPageLabel"></span>
+            <button id="nextCreatedCodesPage" type="button">Trang sau</button>
+        </div>
+    </dialog>
 
     <dialog id="ipHistoryDialog" class="ip-history-dialog" aria-labelledby="ipHistoryTitle">
         <div class="dialog-heading">

@@ -6,7 +6,7 @@ const { rateLimit } = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const bwipjs = require('bwip-js');
 const QRCode = require('qrcode');
-const { createHash, randomUUID } = require('node:crypto');
+const { createHash, randomBytes, randomUUID } = require('node:crypto');
 const path = require('node:path');
 const net = require('node:net');
 const database = require('./database');
@@ -18,6 +18,7 @@ const adminUsername = (process.env.ADMIN_USERNAME || '').trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD || '';
 const sessionSecret = process.env.SESSION_SECRET || '';
 const maxTextLength = 512;
+const generatedCodeRetentionMs = 3 * 24 * 60 * 60 * 1000;
 const trustProxyHops = Math.max(0, Number.parseInt(process.env.TRUST_PROXY_HOPS, 10) || 0);
 const anonymousCookieOptions = {
     httpOnly: true,
@@ -49,10 +50,11 @@ if (!existingAdmin) {
 
 app.set('trust proxy', trustProxyHops);
 app.use(express.json({ limit: '16kb' }));
+const sessionStore = new SQLiteSessionStore(database);
 app.use(session({
     name: 'vtp.sid',
     secret: sessionSecret,
-    store: new SQLiteSessionStore(database),
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -62,7 +64,6 @@ app.use(session({
         maxAge: 8 * 60 * 60 * 1000,
     },
 }));
-
 const loginRateLimit = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 10,
@@ -71,6 +72,14 @@ const loginRateLimit = rateLimit({
     skipSuccessfulRequests: true,
     message: { error: 'Quá nhiều lần đăng nhập không thành công. Vui lòng thử lại sau 15 phút.' },
 });
+const inventoryLoginRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: 'Quá nhiều lần đăng nhập kiểm kê thất bại. Vui lòng thử lại sau 15 phút.' },
+});
 const generationRateLimit = rateLimit({
     windowMs: 60 * 1000,
     limit: 120,
@@ -78,6 +87,21 @@ const generationRateLimit = rateLimit({
     legacyHeaders: false,
     message: { error: 'Đã vượt quá giới hạn tạo mã. Vui lòng thử lại sau.' },
 });
+const pruneExpiredHistory = database.transaction(cutoff => {
+    database.prepare('DELETE FROM history WHERE created_at < ?').run(cutoff);
+    database.prepare('DELETE FROM inventory_history WHERE created_at < ?').run(cutoff);
+});
+
+function pruneGeneratedCodeHistory() {
+    try {
+        pruneExpiredHistory(new Date(Date.now() - generatedCodeRetentionMs).toISOString());
+    } catch (error) {
+        console.error('Không thể dọn lịch sử tạo mã quá hạn.', error);
+    }
+}
+
+pruneGeneratedCodeHistory();
+setInterval(pruneGeneratedCodeHistory, 60 * 60 * 1000).unref();
 
 app.get('/healthz', (req, res) => {
     try {
@@ -114,6 +138,10 @@ function isValidAnonymousToken(value, prefix) {
 }
 
 function hashAnonymousSessionId(value) {
+    return createHash('sha256').update(value).digest('hex');
+}
+
+function hashInventorySessionToken(value) {
     return createHash('sha256').update(value).digest('hex');
 }
 
@@ -200,6 +228,36 @@ function getAdminUser(req) {
     return user;
 }
 
+function getInventoryUser(req) {
+    const token = readCookie(req, 'vtp.kiemke.sid');
+    if (!token) return null;
+    const tokenHash = hashInventorySessionToken(token);
+    const user = database.prepare(`
+        SELECT u.id, u.username
+        FROM inventory_sessions s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.token_hash = ? AND s.expires_at > ?
+            AND u.role = 'operator' AND u.active = 1
+    `).get(tokenHash, Date.now());
+    if (!user) {
+        database.prepare('DELETE FROM inventory_sessions WHERE expires_at <= ?').run(Date.now());
+        return null;
+    }
+    req.inventorySessionHash = tokenHash;
+    return user;
+}
+
+function requireInventoryUser(req, res, next) {
+    const user = getInventoryUser(req);
+    if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập tài khoản kiểm kê.' });
+    req.inventoryUser = user;
+    next();
+}
+
+function revokeInventorySessions(userId) {
+    database.prepare('DELETE FROM inventory_sessions WHERE user_id = ?').run(userId);
+}
+
 function logSessionDebug(req, route) {
     const hasSessionCookie = (req.headers.cookie || '').split(';')
         .some(cookie => cookie.trim().startsWith('vtp.sid='));
@@ -229,6 +287,7 @@ function validateGeographyName(name) {
 function readGeography(includeHidden = false) {
     const districtFilter = includeHidden ? '' : 'WHERE is_hidden = 0';
     const communeFilter = includeHidden ? '' : 'AND is_hidden = 0';
+    const villageFilter = includeHidden ? '' : 'AND is_hidden = 0';
     const districts = database.prepare(`
         SELECT id, name, kind, is_hidden FROM districts ${districtFilter}
         ORDER BY kind, name COLLATE NOCASE
@@ -237,7 +296,18 @@ function readGeography(includeHidden = false) {
         SELECT id, name, is_hidden FROM communes WHERE district_id = ? ${communeFilter}
         ORDER BY name COLLATE NOCASE
     `);
-    return districts.map(district => ({ ...district, communes: getCommunes.all(district.id) }));
+    const getVillages = database.prepare(`
+        SELECT id, name, is_hidden FROM villages
+        WHERE commune_id = ? ${villageFilter}
+        ORDER BY name COLLATE NOCASE
+    `);
+    return districts.map(district => ({
+        ...district,
+        communes: getCommunes.all(district.id).map(commune => ({
+            ...commune,
+            villages: getVillages.all(commune.id),
+        })),
+    }));
 }
 
 function readFormFields() {
@@ -315,7 +385,58 @@ app.post('/api/logout', requireAdmin, (req, res, next) => {
     });
 });
 
+app.get('/api/kiemke/me', requireInventoryUser, (req, res) => {
+    res.json({ id: req.inventoryUser.id, username: req.inventoryUser.username });
+});
+
+app.post('/api/kiemke/login', blockIfIpBlocked, inventoryLoginRateLimit, async (req, res) => {
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const user = database.prepare(`
+        SELECT id, username, password_hash, active, disabled_reason FROM users
+        WHERE username = ? AND role = 'operator'
+    `).get(username);
+
+    if (!user || !await bcrypt.compare(password, user.password_hash)) {
+        return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
+    }
+    if (!user.active) {
+        return res.status(403).json({
+            code: 'ACCOUNT_DISABLED',
+            error: 'Tài khoản kiểm kê đã bị khóa.',
+            reason: user.disabled_reason || 'Vui lòng liên hệ quản trị viên.',
+        });
+    }
+
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+    database.prepare(`
+        INSERT INTO inventory_sessions (token_hash, user_id, expires_at, created_at)
+        VALUES (?, ?, ?, ?)
+    `).run(hashInventorySessionToken(token), user.id, expiresAt, new Date().toISOString());
+    res.cookie('vtp.kiemke.sid', token, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 8 * 60 * 60 * 1000,
+        path: '/',
+    });
+    res.json({ id: user.id, username: user.username });
+});
+
+app.post('/api/kiemke/logout', requireInventoryUser, (req, res) => {
+    database.prepare('DELETE FROM inventory_sessions WHERE token_hash = ?').run(req.inventorySessionHash);
+    res.clearCookie('vtp.kiemke.sid', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+    });
+    res.sendStatus(204);
+});
+
 app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRateLimit, (req, res) => {
+    pruneGeneratedCodeHistory();
     const { barcode, chonHuyen, chonXa, chonThon, fields: submittedFields = {} } = req.body || {};
     if (typeof barcode !== 'string' || barcode.trim().length === 0 || barcode.length > maxTextLength) {
         return res.status(400).json({ error: 'Mã vạch không hợp lệ.' });
@@ -350,7 +471,7 @@ app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRate
     res.status(201).json({ id: result.lastInsertRowid, fields });
 });
 
-app.post('/api/kiemke', blockIfIpBlocked, identifyAnonymousUser, generationRateLimit, async (req, res) => {
+app.post('/api/kiemke', blockIfIpBlocked, identifyAnonymousUser, requireInventoryUser, generationRateLimit, async (req, res) => {
     const waybill = req.body?.waybill;
     if (typeof waybill !== 'string' || waybill.trim().length === 0 || waybill.length > maxTextLength) {
         return res.status(400).json({ error: 'Mã vận đơn không hợp lệ.' });
@@ -363,9 +484,11 @@ app.post('/api/kiemke', blockIfIpBlocked, identifyAnonymousUser, generationRateL
         return res.status(400).json({ error: 'Không thể tạo QR từ mã vận đơn này.' });
     }
 
+    pruneGeneratedCodeHistory();
     const result = database.prepare(`
-        INSERT INTO inventory_history (ip, waybill, created_at, anonymous_user_id) VALUES (?, ?, ?, ?)
-    `).run(req.clientIp, waybill.trim(), new Date().toISOString(), req.anonymousUserId);
+        INSERT INTO inventory_history (ip, waybill, created_at, anonymous_user_id, created_by_user_id)
+        VALUES (?, ?, ?, ?, ?)
+    `).run(req.clientIp, waybill.trim(), new Date().toISOString(), req.anonymousUserId, req.inventoryUser.id);
 
     res.status(201).json({ id: result.lastInsertRowid, qrCode });
 });
@@ -570,7 +693,76 @@ app.patch('/api/admin/communes/:id/visibility', requireAdmin, (req, res) => {
     res.sendStatus(204);
 });
 
+app.post('/api/admin/villages', requireAdmin, (req, res) => {
+    const communeId = Number.parseInt(req.body?.communeId, 10);
+    const name = req.body?.name;
+    if (!Number.isInteger(communeId) || !validateGeographyName(name)) {
+        return res.status(400).json({ error: 'Tên thôn hoặc xã không hợp lệ.' });
+    }
+
+    try {
+        const result = database.prepare(`
+            INSERT INTO villages (commune_id, name, created_at)
+            VALUES (?, ?, ?)
+        `).run(communeId, name.trim(), new Date().toISOString());
+        res.status(201).json({ id: result.lastInsertRowid });
+    } catch (error) {
+        if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+            return res.status(404).json({ error: 'Không tìm thấy xã đã chọn.' });
+        }
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            return res.status(409).json({ error: 'Thôn này đã tồn tại trong xã đã chọn.' });
+        }
+        throw error;
+    }
+});
+
+app.put('/api/admin/villages/:id', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const communeId = Number.parseInt(req.body?.communeId, 10);
+    const name = req.body?.name;
+    if (!Number.isInteger(id) || !Number.isInteger(communeId) || !validateGeographyName(name)) {
+        return res.status(400).json({ error: 'Thông tin thôn không hợp lệ.' });
+    }
+
+    try {
+        const result = database.prepare('UPDATE villages SET name = ?, commune_id = ? WHERE id = ?')
+            .run(name.trim(), communeId, id);
+        if (result.changes === 0) return res.status(404).json({ error: 'Không tìm thấy thôn.' });
+        res.sendStatus(204);
+    } catch (error) {
+        if (error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+            return res.status(404).json({ error: 'Không tìm thấy xã đã chọn.' });
+        }
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            return res.status(409).json({ error: 'Thôn này đã tồn tại trong xã đã chọn.' });
+        }
+        throw error;
+    }
+});
+
+app.delete('/api/admin/villages/:id', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Mã thôn không hợp lệ.' });
+    const result = database.prepare('DELETE FROM villages WHERE id = ?').run(id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Không tìm thấy thôn.' });
+    res.sendStatus(204);
+});
+
+app.patch('/api/admin/villages/:id/visibility', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const hidden = req.body?.hidden;
+    if (!Number.isInteger(id) || typeof hidden !== 'boolean') {
+        return res.status(400).json({ error: 'Trạng thái hiển thị thôn không hợp lệ.' });
+    }
+    const result = database.prepare('UPDATE villages SET is_hidden = ? WHERE id = ?')
+        .run(hidden ? 1 : 0, id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Không tìm thấy thôn.' });
+    res.sendStatus(204);
+});
+
 app.get('/api/admin/history', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = 50;
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
@@ -601,10 +793,64 @@ app.get('/api/admin/history', requireAdmin, (req, res) => {
     `).all(...values, limit, (page - 1) * limit)
         .map(({ field_values: fieldValues, ...row }) => ({ ...row, fields: parseFieldValues(fieldValues) }));
 
+    const generatedCodeTotal = database.prepare(`
+        SELECT (SELECT COUNT(*) FROM history) + (SELECT COUNT(*) FROM inventory_history) AS count
+    `).get().count;
+    res.json({ rows, total, generatedCodeTotal, page, pages: Math.max(1, Math.ceil(total / limit)) });
+});
+
+app.get('/api/admin/created-codes', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = 50;
+    const ip = typeof req.query.ip === 'string' ? req.query.ip : '';
+    const anonymousUserId = typeof req.query.anonymousUserId === 'string' ? req.query.anonymousUserId : '';
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+    if (ip && ip !== 'unknown' && !net.isIP(ip)) {
+        return res.status(400).json({ error: 'Địa chỉ IP không hợp lệ.' });
+    }
+    if (anonymousUserId && !isValidAnonymousToken(anonymousUserId, 'u')) {
+        return res.status(400).json({ error: 'Anonymous user ID không hợp lệ.' });
+    }
+
+    const conditions = [];
+    const values = [];
+    if (ip) { conditions.push('ip = ?'); values.push(ip); }
+    if (anonymousUserId) { conditions.push('anonymous_user_id = ?'); values.push(anonymousUserId); }
+    if (search) {
+        conditions.push('(code LIKE ? OR ip LIKE ? OR creator_username LIKE ? OR anonymous_user_id LIKE ?)');
+        const query = `%${search}%`;
+        values.push(query, query, query, query);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const codes = `
+        SELECT id, 'tem' AS code_type, barcode AS code, ip, anonymous_user_id,
+            COALESCE(legacy_username, '') AS creator_username,
+            district, commune, village, created_at
+        FROM history
+        UNION ALL
+        SELECT ih.id, 'kiểm kê' AS code_type, ih.waybill AS code, ih.ip, ih.anonymous_user_id,
+            COALESCE(u.username, '') AS creator_username,
+            '' AS district, '' AS commune, '' AS village, ih.created_at
+        FROM inventory_history ih
+        LEFT JOIN users u ON u.id = ih.created_by_user_id
+    `;
+    const total = database.prepare(`WITH codes AS (${codes}) SELECT COUNT(*) AS count FROM codes ${where}`)
+        .get(...values).count;
+    const rows = database.prepare(`
+        WITH codes AS (${codes})
+        SELECT id, code_type, code, ip, anonymous_user_id, creator_username,
+            district, commune, village, created_at
+        FROM codes ${where}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ? OFFSET ?
+    `).all(...values, limit, (page - 1) * limit);
+
     res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
 });
 
 app.get('/api/admin/kiemke-history', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = 50;
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
@@ -612,17 +858,25 @@ app.get('/api/admin/kiemke-history', requireAdmin, (req, res) => {
     let where = '';
 
     if (search) {
-        where = 'WHERE waybill LIKE ? OR ip LIKE ?';
+        where = 'WHERE ih.waybill LIKE ? OR ih.ip LIKE ? OR u.username LIKE ?';
         const query = `%${search}%`;
-        values.push(query, query);
+        values.push(query, query, query);
     }
 
-    const total = database.prepare(`SELECT COUNT(*) AS count FROM inventory_history ${where}`)
+    const total = database.prepare(`
+        SELECT COUNT(*) AS count
+        FROM inventory_history ih
+        LEFT JOIN users u ON u.id = ih.created_by_user_id
+        ${where}
+    `)
         .get(...values).count;
     const rows = database.prepare(`
-        SELECT id, ip, waybill, created_at, anonymous_user_id
-        FROM inventory_history ${where}
-        ORDER BY id DESC
+        SELECT ih.id, ih.ip, ih.waybill, ih.created_at, ih.anonymous_user_id,
+            ih.created_by_user_id, u.username AS creator_username
+        FROM inventory_history ih
+        LEFT JOIN users u ON u.id = ih.created_by_user_id
+        ${where}
+        ORDER BY ih.id DESC
         LIMIT ? OFFSET ?
     `).all(...values, limit, (page - 1) * limit);
 
@@ -630,6 +884,7 @@ app.get('/api/admin/kiemke-history', requireAdmin, (req, res) => {
 });
 
 app.get('/api/admin/anonymous-users', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = 50;
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
@@ -647,7 +902,7 @@ app.get('/api/admin/anonymous-users', requireAdmin, (req, res) => {
 
     const total = database.prepare(`SELECT COUNT(*) AS count FROM anonymous_users u ${where}`)
         .get(...values).count;
-    const rows = database.prepare(`
+    const users = database.prepare(`
         SELECT u.id, u.first_seen_at, u.last_seen_at,
             (SELECT COUNT(*) FROM anonymous_sessions s WHERE s.anonymous_user_id = u.id) AS session_count,
             (SELECT COUNT(*) FROM anonymous_user_ips ui WHERE ui.anonymous_user_id = u.id) AS ip_count,
@@ -658,11 +913,25 @@ app.get('/api/admin/anonymous-users', requireAdmin, (req, res) => {
         LIMIT ? OFFSET ?
     `).all(...values, limit, (page - 1) * limit)
         .map(row => ({ ...row, generated_code_count: row.history_count + row.inventory_count }));
+    const userIds = users.map(user => user.id);
+    const ipsByUser = new Map(userIds.map(userId => [userId, []]));
+    if (userIds.length > 0) {
+        const placeholders = userIds.map(() => '?').join(', ');
+        const ips = database.prepare(`
+            SELECT anonymous_user_id, ip
+            FROM anonymous_user_ips
+            WHERE anonymous_user_id IN (${placeholders})
+            ORDER BY last_seen_at DESC
+        `).all(...userIds);
+        for (const entry of ips) ipsByUser.get(entry.anonymous_user_id).push(entry.ip);
+    }
+    const rows = users.map(user => ({ ...user, ips: ipsByUser.get(user.id) }));
 
     res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
 });
 
 app.get('/api/admin/anonymous-users/:id', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
     if (!isValidAnonymousToken(req.params.id, 'u')) {
         return res.status(400).json({ error: 'Anonymous user ID không hợp lệ.' });
     }
@@ -699,20 +968,160 @@ app.get('/api/admin/anonymous-users/:id', requireAdmin, (req, res) => {
     });
 });
 
-app.get('/api/admin/ips', requireAdmin, (req, res) => {
+app.get('/api/admin/inventory-accounts', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = 50;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+    const where = search ? "WHERE u.role = 'operator' AND u.username LIKE ?" : "WHERE u.role = 'operator'";
+    const values = search ? [`%${search}%`] : [];
+    const total = database.prepare(`SELECT COUNT(*) AS count FROM users u ${where}`).get(...values).count;
     const rows = database.prepare(`
-        SELECT h.ip, COALESCE(c.label, '') AS label,
-            COALESCE(c.blocked, 0) AS blocked, COUNT(h.id) AS code_count,
-            MAX(h.created_at) AS last_seen
-        FROM history h
-        LEFT JOIN ip_controls c ON c.ip = h.ip
-        GROUP BY h.ip
+        SELECT u.id, u.username, u.active, u.disabled_reason, u.created_at,
+            COUNT(ih.id) AS order_count, MAX(ih.created_at) AS last_seen
+        FROM users u
+        LEFT JOIN inventory_history ih ON ih.created_by_user_id = u.id
+        ${where}
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+        LIMIT ? OFFSET ?
+    `).all(...values, limit, (page - 1) * limit);
+
+    res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
+});
+
+app.get('/api/admin/inventory-accounts/:id/orders', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
+    const userId = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(userId)) return res.status(400).json({ error: 'Mã tài khoản không hợp lệ.' });
+    const account = database.prepare("SELECT id FROM users WHERE id = ? AND role = 'operator'").get(userId);
+    if (!account) return res.status(404).json({ error: 'Không tìm thấy tài khoản kiểm kê.' });
+
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    const timezoneOffset = Number.parseInt(req.query.timezoneOffset, 10) || 0;
+    const parseDateBoundary = value => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+        const utcDate = new Date(`${value}T00:00:00.000Z`);
+        if (Number.isNaN(utcDate.getTime()) || utcDate.toISOString().slice(0, 10) !== value) return null;
+        return new Date(utcDate.getTime() + timezoneOffset * 60 * 1000);
+    };
+    if (Math.abs(timezoneOffset) > 14 * 60) {
+        return res.status(400).json({ error: 'Múi giờ không hợp lệ.' });
+    }
+
+    const fromDate = from ? parseDateBoundary(from) : null;
+    const toDate = to ? parseDateBoundary(to) : null;
+    if ((from && !fromDate) || (to && !toDate)) {
+        return res.status(400).json({ error: 'Ngày lọc không hợp lệ.' });
+    }
+    const toExclusive = toDate ? new Date(toDate.getTime() + 24 * 60 * 60 * 1000) : null;
+    if (fromDate && toExclusive && fromDate >= toExclusive) {
+        return res.status(400).json({ error: 'Khoảng ngày lọc không hợp lệ.' });
+    }
+
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = 50;
+    const conditions = ['created_by_user_id = ?', 'created_at >= ?'];
+    const values = [userId, new Date(Date.now() - generatedCodeRetentionMs).toISOString()];
+    if (fromDate) {
+        conditions.push('created_at >= ?');
+        values.push(fromDate.toISOString());
+    }
+    if (toExclusive) {
+        conditions.push('created_at < ?');
+        values.push(toExclusive.toISOString());
+    }
+    const where = conditions.join(' AND ');
+    const total = database.prepare(`SELECT COUNT(*) AS count FROM inventory_history WHERE ${where}`)
+        .get(...values).count;
+    const rows = database.prepare(`
+        SELECT id, waybill, ip, created_at
+        FROM inventory_history
+        WHERE ${where}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ? OFFSET ?
+    `).all(...values, limit, (page - 1) * limit);
+
+    res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
+});
+
+app.post('/api/admin/inventory-accounts', requireAdmin, (req, res) => {
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!/^[a-z0-9._-]{3,32}$/.test(username)
+        || password.length < 6
+        || Buffer.byteLength(password, 'utf8') > 72) {
+        return res.status(400).json({ error: 'Tên đăng nhập phải từ 3-32 ký tự; mật khẩu từ 6 ký tự và tối đa 72 byte.' });
+    }
+
+    try {
+        const result = database.prepare(`
+            INSERT INTO users (username, password_hash, role, active, created_at)
+            VALUES (?, ?, 'operator', 1, ?)
+        `).run(username, bcrypt.hashSync(password, 12), new Date().toISOString());
+        res.status(201).json({ id: result.lastInsertRowid, username });
+    } catch (error) {
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            return res.status(409).json({ error: 'Tên đăng nhập đã tồn tại.' });
+        }
+        throw error;
+    }
+});
+
+app.patch('/api/admin/inventory-accounts/:id', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const { active, reason = '' } = req.body || {};
+    if (!Number.isInteger(id) || typeof active !== 'boolean'
+        || typeof reason !== 'string' || reason.trim().length > 500
+        || (!active && !reason.trim())) {
+        return res.status(400).json({ error: 'Tài khoản hoặc trạng thái không hợp lệ.' });
+    }
+
+    const result = database.prepare(`
+        UPDATE users SET active = ?, disabled_reason = ? WHERE id = ? AND role = 'operator'
+    `).run(active ? 1 : 0, active ? '' : reason.trim(), id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Không tìm thấy tài khoản kiểm kê.' });
+    if (!active) revokeInventorySessions(id);
+    res.sendStatus(204);
+});
+
+app.put('/api/admin/inventory-accounts/:id/password', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!Number.isInteger(id) || password.length < 6 || Buffer.byteLength(password, 'utf8') > 72) {
+        return res.status(400).json({ error: 'Mật khẩu phải từ 6 ký tự và tối đa 72 byte.' });
+    }
+
+    const result = database.prepare(`
+        UPDATE users SET password_hash = ? WHERE id = ? AND role = 'operator'
+    `).run(bcrypt.hashSync(password, 12), id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Không tìm thấy tài khoản kiểm kê.' });
+    revokeInventorySessions(id);
+    res.sendStatus(204);
+});
+
+app.get('/api/admin/ips', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
+    const rows = database.prepare(`
+        WITH codes AS (
+            SELECT ip, created_at FROM history
+            UNION ALL
+            SELECT ip, created_at FROM inventory_history
+        )
+        SELECT codes.ip, COALESCE(c.label, '') AS label,
+            COALESCE(c.blocked, 0) AS blocked, COUNT(*) AS code_count,
+            MAX(codes.created_at) AS last_seen
+        FROM codes
+        LEFT JOIN ip_controls c ON c.ip = codes.ip
+        GROUP BY codes.ip
         ORDER BY blocked DESC, last_seen DESC
     `).all();
     res.json(rows);
 });
 
 app.get('/api/admin/ips/:ip/history', requireAdmin, (req, res) => {
+    pruneGeneratedCodeHistory();
     const ip = req.params.ip;
     if (ip !== 'unknown' && !net.isIP(ip)) {
         return res.status(400).json({ error: 'Địa chỉ IP không hợp lệ.' });

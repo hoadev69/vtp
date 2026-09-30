@@ -15,6 +15,7 @@ database.exec(`
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL CHECK (role IN ('admin', 'operator')),
         active INTEGER NOT NULL DEFAULT 1,
+        disabled_reason TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL
     );
 
@@ -41,6 +42,16 @@ database.exec(`
         created_at TEXT NOT NULL,
         UNIQUE (district_id, name),
         FOREIGN KEY (district_id) REFERENCES districts(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS villages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        commune_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        is_hidden INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        UNIQUE (commune_id, name),
+        FOREIGN KEY (commune_id) REFERENCES communes(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS form_fields (
@@ -88,14 +99,28 @@ database.exec(`
     );
     CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
 
+    CREATE TABLE IF NOT EXISTS inventory_sessions (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS inventory_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip TEXT NOT NULL,
         waybill TEXT NOT NULL,
         anonymous_user_id TEXT,
+        created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at TEXT NOT NULL
     );
 `);
+
+const userColumns = database.pragma('table_info(users)');
+if (!userColumns.some(column => column.name === 'disabled_reason')) {
+    database.exec("ALTER TABLE users ADD COLUMN disabled_reason TEXT NOT NULL DEFAULT ''");
+}
 
 for (const [table, column] of [['districts', 'is_hidden'], ['communes', 'is_hidden']]) {
     const columns = database.pragma(`table_info(${table})`);
@@ -154,13 +179,19 @@ const inventoryHistoryColumns = database.pragma('table_info(inventory_history)')
 if (!inventoryHistoryColumns.some(column => column.name === 'anonymous_user_id')) {
     database.exec('ALTER TABLE inventory_history ADD COLUMN anonymous_user_id TEXT');
 }
+if (!inventoryHistoryColumns.some(column => column.name === 'created_by_user_id')) {
+    database.exec('ALTER TABLE inventory_history ADD COLUMN created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
+}
 
 database.exec(`
     CREATE INDEX IF NOT EXISTS history_created_at_idx ON history(created_at DESC);
     CREATE INDEX IF NOT EXISTS history_ip_idx ON history(ip);
     CREATE INDEX IF NOT EXISTS history_anonymous_user_idx ON history(anonymous_user_id);
+    CREATE INDEX IF NOT EXISTS villages_commune_idx ON villages(commune_id, is_hidden, name COLLATE NOCASE);
     CREATE INDEX IF NOT EXISTS inventory_history_created_at_idx ON inventory_history(created_at DESC);
     CREATE INDEX IF NOT EXISTS inventory_history_anonymous_user_idx ON inventory_history(anonymous_user_id);
+    CREATE INDEX IF NOT EXISTS inventory_history_creator_idx ON inventory_history(created_by_user_id);
+    CREATE INDEX IF NOT EXISTS inventory_sessions_user_idx ON inventory_sessions(user_id, expires_at);
     CREATE INDEX IF NOT EXISTS anonymous_sessions_user_idx ON anonymous_sessions(anonymous_user_id, last_seen_at DESC);
     CREATE INDEX IF NOT EXISTS anonymous_user_ips_ip_idx ON anonymous_user_ips(ip);
 `);
@@ -187,6 +218,32 @@ if (!database.prepare('SELECT 1 FROM app_settings WHERE key = ?').get('geography
             .run('geography_seeded', '1');
     });
     seedGeography();
+}
+
+if (!database.prepare('SELECT 1 FROM app_settings WHERE key = ?').get('villages_seeded')) {
+    const existingVillages = [
+        ['H.Bảo Thắng', 'Gia Phú', ['Thôn Nậm Hẻn', 'Thôn Đông Căm', 'Thôn Hùng Thắng', 'Thôn Phú Xuân', 'Thôn Bến Phà', 'Thôn Chính Tiến', 'Thôn Soi Cờ', 'Thôn Soi Giá', 'Thôn Đồng Lục', 'Bản Bay', 'Thôn Xuân Tư']],
+        ['TP.Lào Cai', 'Thống Nhất', ['Thôn Hòa Lạc', 'Thôn Thái Bo', 'Thôn Giao Ngay', 'Thôn Giao Tiến', 'Thôn Tiến Cường', 'Thôn Tân Tiến', 'Thôn Tiến Thắng', 'Thôn Muồng', 'Thôn Chang', 'Phú Hùng', 'Thôn Mường Bát', 'Bản Cam', 'Thôn Khe Luộc', 'Thôn Kắp kẹ', 'Thôn An Thành']],
+        ['H.Bảo Thắng', 'Xuân Giao', ['Thôn Chành', 'Thôn Hùng Xuân', 'Thôn Tiến Lợi', 'Thôn Giao Bình', 'Thôn Mường', 'Thôn Phẻo', 'Thôn Vàng', 'Thôn Hợp Giao']],
+        ['H.Bảo Thắng', 'Phú Nhuận', ['Phú Thịnh 1', 'Phú Thịnh 2', 'Phú Thịnh 3', 'Phú An 1', 'Phú An 2', 'Tân Lập', 'Phú Sơn', 'Làng Đền', 'Khe Bá', 'Phú Hải 2', 'Phú Hải 3', 'Nhuần 2', 'Nhuần 3']],
+    ];
+    const insertVillage = database.prepare(`
+        INSERT OR IGNORE INTO villages (commune_id, name, created_at)
+        SELECT c.id, ?, ?
+        FROM communes c JOIN districts d ON d.id = c.district_id
+        WHERE d.name = ? AND c.name = ?
+    `);
+    const seedVillages = database.transaction(() => {
+        const createdAt = new Date().toISOString();
+        for (const [districtName, communeName, villageNames] of existingVillages) {
+            for (const villageName of new Set(villageNames)) {
+                insertVillage.run(villageName, createdAt, districtName, communeName);
+            }
+        }
+        database.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?)')
+            .run('villages_seeded', '1');
+    });
+    seedVillages();
 }
 
     if (!database.prepare('SELECT 1 FROM app_settings WHERE key = ?').get('form_fields_seeded')) {

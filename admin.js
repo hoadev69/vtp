@@ -1,17 +1,37 @@
 const historyRows = document.getElementById('historyRows');
-const inventoryHistoryRows = document.getElementById('inventoryHistoryRows');
+const inventoryAccountRows = document.getElementById('inventoryAccountRows');
+const inventoryOrdersRows = document.getElementById('inventoryOrdersRows');
+const anonymousUserRows = document.getElementById('anonymousUserRows');
 const ipRows = document.getElementById('ipRows');
 const historyError = document.getElementById('historyError');
-const inventoryHistoryError = document.getElementById('inventoryHistoryError');
+const inventoryAccountsError = document.getElementById('inventoryAccountsError');
+const inventoryOrdersError = document.getElementById('inventoryOrdersError');
+const inventoryAccountCreateDialog = document.getElementById('inventoryAccountCreateDialog');
+const inventoryAccountCreateError = document.getElementById('inventoryAccountCreateError');
+const lockInventoryAccountDialog = document.getElementById('lockInventoryAccountDialog');
+const lockInventoryAccountError = document.getElementById('lockInventoryAccountError');
+const resetInventoryPasswordDialog = document.getElementById('resetInventoryPasswordDialog');
+const resetInventoryPasswordError = document.getElementById('resetInventoryPasswordError');
+const anonymousUsersError = document.getElementById('anonymousUsersError');
 const ipError = document.getElementById('ipError');
 const searchInput = document.getElementById('searchInput');
-const inventorySearchInput = document.getElementById('inventorySearchInput');
+const inventoryAccountSearch = document.getElementById('inventoryAccountSearch');
+const anonymousUserSearch = document.getElementById('anonymousUserSearch');
 let currentPage = 1;
 let totalPages = 1;
-let inventoryCurrentPage = 1;
-let inventoryTotalPages = 1;
+let inventoryAccountCurrentPage = 1;
+let inventoryAccountTotalPages = 1;
+let inventoryOrdersCurrentPage = 1;
+let inventoryOrdersTotalPages = 1;
+let anonymousCurrentPage = 1;
+let anonymousTotalPages = 1;
 let searchTimer;
-let inventorySearchTimer;
+let inventoryAccountSearchTimer;
+let activeInventoryAccountId = null;
+let activeLockInventoryAccountId = null;
+let activeResetInventoryAccountId = null;
+let activeInventoryOrdersDay = 'today';
+let anonymousSearchTimer;
 let showBlockedOnly = false;
 const recreationEntries = new Map();
 
@@ -45,9 +65,12 @@ function restoreRowValues(group, row) {
     } else if (group === 'geography' && row.dataset.rowType === 'district') {
         row.querySelector('.district-name').value = row.dataset.name;
         row.querySelector('.district-kind').value = row.dataset.kind;
-    } else if (group === 'geography') {
+    } else if (group === 'geography' && row.dataset.rowType === 'commune') {
         row.querySelector('.commune-name').value = row.dataset.name;
         row.querySelector('.commune-district').value = row.dataset.parentDistrictId;
+    } else if (group === 'geography' && row.dataset.rowType === 'village') {
+        row.querySelector('.village-name').value = row.dataset.name;
+        row.querySelector('.village-commune').value = row.dataset.parentCommuneId;
     } else if (group === 'fields') {
         row.querySelector('.form-field-label').value = row.dataset.label;
         row.querySelector('.form-field-visible').checked = row.dataset.visible === 'true';
@@ -58,7 +81,7 @@ function restoreRowValues(group, row) {
 function getEditGroupRows(group) {
     if (group === 'ips') return [...document.querySelectorAll('#ipRows tr[data-ip]')];
     if (group === 'geography') {
-        return [...document.querySelectorAll('#districtRows tr[data-district-id], #communeRows tr[data-commune-id]')];
+        return [...document.querySelectorAll('#districtRows tr[data-district-id], #communeRows tr[data-commune-id], #villageRows tr[data-village-id]')];
     }
     return [...document.querySelectorAll('#formFieldRows tr[data-field-key]')];
 }
@@ -76,9 +99,13 @@ function rowHasChanges(group, row) {
         return row.querySelector('.district-name').value.trim() !== row.dataset.name
             || row.querySelector('.district-kind').value !== row.dataset.kind;
     }
-    if (group === 'geography') {
+    if (group === 'geography' && row.dataset.rowType === 'commune') {
         return row.querySelector('.commune-name').value.trim() !== row.dataset.name
             || row.querySelector('.commune-district').value !== String(row.dataset.parentDistrictId);
+    }
+    if (group === 'geography' && row.dataset.rowType === 'village') {
+        return row.querySelector('.village-name').value.trim() !== row.dataset.name
+            || row.querySelector('.village-commune').value !== String(row.dataset.parentCommuneId);
     }
     return row.querySelector('.form-field-label').value.trim() !== row.dataset.label
         || row.querySelector('.form-field-visible').checked !== (row.dataset.visible === 'true')
@@ -118,7 +145,7 @@ async function saveEditGroup(group) {
                 row.dataset.kind = kind;
                 row.querySelector('.district-name-text').textContent = name;
                 row.querySelector('.district-kind-text').textContent = kind === 'city' ? 'Thành phố' : 'Huyện';
-            } else if (group === 'geography') {
+            } else if (group === 'geography' && row.dataset.rowType === 'commune') {
                 const name = row.querySelector('.commune-name').value.trim();
                 const parentDistrictId = row.querySelector('.commune-district').value;
                 await api(`/api/admin/communes/${row.dataset.communeId}`, {
@@ -130,6 +157,18 @@ async function saveEditGroup(group) {
                 row.dataset.parentDistrictId = parentDistrictId;
                 row.querySelector('.commune-name-text').textContent = name;
                 row.querySelector('.commune-district-text').textContent = row.querySelector('.commune-district').selectedOptions[0]?.textContent || '—';
+            } else if (group === 'geography' && row.dataset.rowType === 'village') {
+                const name = row.querySelector('.village-name').value.trim();
+                const parentCommuneId = row.querySelector('.village-commune').value;
+                await api(`/api/admin/villages/${row.dataset.villageId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, communeId: parentCommuneId }),
+                });
+                row.dataset.name = name;
+                row.dataset.parentCommuneId = parentCommuneId;
+                row.querySelector('.village-name-text').textContent = name;
+                row.querySelector('.village-commune-text').textContent = row.querySelector('.village-commune').selectedOptions[0]?.textContent || '—';
             } else {
                 const label = row.querySelector('.form-field-label').value.trim();
                 const visible = row.querySelector('.form-field-visible').checked;
@@ -434,26 +473,133 @@ async function loadHistory() {
     }
 }
 
-async function loadInventoryHistory() {
-    inventoryHistoryError.hidden = true;
+async function loadInventoryAccounts() {
+    inventoryAccountsError.hidden = true;
     const query = new URLSearchParams({
-        page: String(inventoryCurrentPage),
-        search: inventorySearchInput.value.trim(),
+        page: String(inventoryAccountCurrentPage),
+        search: inventoryAccountSearch.value.trim(),
     });
     try {
-        const result = await api(`/api/admin/kiemke-history?${query}`);
-        inventoryTotalPages = result.pages;
-        document.getElementById('inventoryPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} mã`;
-        document.getElementById('previousInventoryPage').disabled = result.page <= 1;
-        document.getElementById('nextInventoryPage').disabled = result.page >= result.pages;
-        inventoryHistoryRows.replaceChildren();
+        const result = await api(`/api/admin/inventory-accounts?${query}`);
+        inventoryAccountTotalPages = result.pages;
+        document.getElementById('inventoryAccountPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} tài khoản`;
+        document.getElementById('previousInventoryAccountPage').disabled = result.page <= 1;
+        document.getElementById('nextInventoryAccountPage').disabled = result.page >= result.pages;
+        inventoryAccountRows.replaceChildren();
 
         if (result.rows.length === 0) {
             const row = document.createElement('tr');
-            const cell = appendCell(row, 'Chưa có lịch sử kiểm kê phù hợp.');
-            cell.colSpan = 3;
+            const cell = appendCell(row, 'Chưa có tài khoản kiểm kê phù hợp.');
+            cell.colSpan = 6;
             cell.className = 'empty-row';
-            inventoryHistoryRows.append(row);
+            inventoryAccountRows.append(row);
+            return;
+        }
+
+        for (const account of result.rows) {
+            const row = document.createElement('tr');
+            row.dataset.accountId = account.id;
+            row.dataset.username = account.username;
+            row.dataset.active = String(Boolean(account.active));
+            appendCell(row, account.username);
+            const statusCell = document.createElement('td');
+            const status = document.createElement('span');
+            status.className = `ip-status${account.active ? '' : ' blocked'}`;
+            status.textContent = account.active ? 'Đang hoạt động' : 'Đã khóa';
+            statusCell.append(status);
+            if (!account.active && account.disabled_reason) {
+                const reason = document.createElement('small');
+                reason.className = 'account-lock-reason';
+                reason.textContent = account.disabled_reason;
+                statusCell.append(reason);
+            }
+            row.append(statusCell);
+            appendCell(row, formatDate(account.created_at));
+            const orderCountCell = document.createElement('td');
+            const orderCountButton = document.createElement('button');
+            orderCountButton.type = 'button';
+            orderCountButton.className = 'ip-code-count';
+            orderCountButton.dataset.inventoryOrders = account.id;
+            orderCountButton.dataset.username = account.username;
+            orderCountButton.textContent = Number(account.order_count).toLocaleString('vi-VN');
+            orderCountButton.setAttribute('aria-label', `Xem ${account.order_count} mã kiểm kê của ${account.username}`);
+            orderCountCell.append(orderCountButton);
+            row.append(orderCountCell);
+            appendCell(row, account.last_seen ? formatDate(account.last_seen) : '—');
+
+            const actions = document.createElement('td');
+            actions.className = 'ip-actions';
+            const toggleButton = document.createElement('button');
+            toggleButton.type = 'button';
+            toggleButton.dataset.accountAction = 'toggle';
+            toggleButton.textContent = account.active ? 'Khóa' : 'Mở khóa';
+            actions.append(toggleButton);
+            const passwordButton = document.createElement('button');
+            passwordButton.type = 'button';
+            passwordButton.dataset.accountAction = 'password';
+            passwordButton.textContent = 'Đặt mật khẩu';
+            actions.append(passwordButton);
+            row.append(actions);
+            inventoryAccountRows.append(row);
+        }
+    } catch (error) {
+        inventoryAccountsError.textContent = error.message;
+        inventoryAccountsError.hidden = false;
+    }
+}
+
+async function openInventoryOrders(accountId, username) {
+    activeInventoryAccountId = accountId;
+    inventoryOrdersCurrentPage = 1;
+    document.getElementById('inventoryOrdersTitle').textContent = 'Mã kiểm kê';
+    document.getElementById('inventoryOrdersSubtitle').textContent = username;
+    setInventoryOrdersDay('today');
+    const dialog = document.getElementById('inventoryOrdersDialog');
+    if (!dialog.open) dialog.showModal();
+    await loadInventoryOrders();
+}
+
+function getInventoryOrdersDate(day) {
+    const daysAgo = { today: 0, yesterday: 1, 'two-days-ago': 2 }[day] ?? 0;
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    const value = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    const localMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return { value, timezoneOffset: localMidnight.getTimezoneOffset() };
+}
+
+function setInventoryOrdersDay(day) {
+    activeInventoryOrdersDay = day;
+    document.querySelectorAll('[data-inventory-day]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.inventoryDay === day));
+    });
+}
+
+async function loadInventoryOrders() {
+    if (activeInventoryAccountId === null) return;
+    inventoryOrdersError.hidden = true;
+    const selectedDate = getInventoryOrdersDate(activeInventoryOrdersDay);
+    const query = new URLSearchParams({
+        page: String(inventoryOrdersCurrentPage),
+        from: selectedDate.value,
+        to: selectedDate.value,
+        timezoneOffset: String(selectedDate.timezoneOffset),
+    });
+
+    try {
+        const result = await api(`/api/admin/inventory-accounts/${activeInventoryAccountId}/orders?${query}`);
+        inventoryOrdersTotalPages = result.pages;
+        document.getElementById('inventoryOrdersPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} mã trong 3 ngày`;
+        document.getElementById('previousInventoryOrdersPage').disabled = result.page <= 1;
+        document.getElementById('nextInventoryOrdersPage').disabled = result.page >= result.pages;
+        inventoryOrdersRows.replaceChildren();
+
+        if (result.rows.length === 0) {
+            const row = document.createElement('tr');
+            const cell = appendCell(row, 'Không có mã nào trong khoảng ngày này.');
+            cell.colSpan = 4;
+            cell.className = 'empty-row';
+            inventoryOrdersRows.append(row);
             return;
         }
 
@@ -462,11 +608,19 @@ async function loadInventoryHistory() {
             appendCell(row, formatDate(entry.created_at));
             appendCell(row, entry.ip === 'unknown' ? 'Chưa ghi nhận IP' : entry.ip);
             appendCell(row, entry.waybill);
-            inventoryHistoryRows.append(row);
+            const actionCell = document.createElement('td');
+            const qrButton = document.createElement('button');
+            qrButton.type = 'button';
+            qrButton.dataset.inventoryQrWaybill = entry.waybill;
+            qrButton.setAttribute('aria-label', `Xem QR ${entry.waybill}`);
+            qrButton.textContent = 'Xem QR';
+            actionCell.append(qrButton);
+            row.append(actionCell);
+            inventoryOrdersRows.append(row);
         }
     } catch (error) {
-        inventoryHistoryError.textContent = error.message;
-        inventoryHistoryError.hidden = false;
+        inventoryOrdersError.textContent = error.message;
+        inventoryOrdersError.hidden = false;
     }
 }
 
@@ -550,6 +704,45 @@ async function loadIps() {
     }
 }
 
+async function loadAnonymousUsers() {
+    anonymousUsersError.hidden = true;
+    const query = new URLSearchParams({
+        page: String(anonymousCurrentPage),
+        search: anonymousUserSearch.value.trim(),
+    });
+    try {
+        const result = await api(`/api/admin/anonymous-users?${query}`);
+        anonymousTotalPages = result.pages;
+        document.getElementById('anonymousPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} UID`;
+        document.getElementById('previousAnonymousPage').disabled = result.page <= 1;
+        document.getElementById('nextAnonymousPage').disabled = result.page >= result.pages;
+        anonymousUserRows.replaceChildren();
+
+        if (result.rows.length === 0) {
+            const row = document.createElement('tr');
+            const cell = appendCell(row, 'Chưa có anonymous UID phù hợp.');
+            cell.colSpan = 6;
+            cell.className = 'empty-row';
+            anonymousUserRows.append(row);
+            return;
+        }
+
+        for (const entry of result.rows) {
+            const row = document.createElement('tr');
+            appendCell(row, entry.id);
+            appendCell(row, entry.ips.join(', '));
+            appendCell(row, Number(entry.session_count).toLocaleString('vi-VN'));
+            appendCell(row, Number(entry.generated_code_count).toLocaleString('vi-VN'));
+            appendCell(row, formatDate(entry.first_seen_at));
+            appendCell(row, formatDate(entry.last_seen_at));
+            anonymousUserRows.append(row);
+        }
+    } catch (error) {
+        anonymousUsersError.textContent = error.message;
+        anonymousUsersError.hidden = false;
+    }
+}
+
 function showAdminInitError(message) {
     let banner = document.getElementById('adminInitError');
     if (!banner) {
@@ -558,7 +751,18 @@ function showAdminInitError(message) {
         banner.style.cssText = 'background:#fee;color:#900;padding:12px;margin:12px 0;border:1px solid #900;font-family:monospace;white-space:pre-wrap;';
         document.body.prepend(banner);
     }
-    banner.textContent = message;
+    banner.replaceChildren();
+    const messageText = document.createElement('span');
+    messageText.textContent = message;
+    banner.append(messageText);
+
+    if (message.includes('HTTP 401')) {
+        const loginLink = document.createElement('a');
+        loginLink.href = '/admin';
+        loginLink.textContent = 'Đăng nhập lại';
+        loginLink.style.cssText = 'display:inline-block;margin:8px 0 0 10px;color:#900;font-weight:700;text-decoration:underline;';
+        banner.append(loginLink);
+    }
 }
 
 fetch('/api/admin/me').then(async response => {
@@ -585,6 +789,185 @@ document.getElementById('logoutButton').addEventListener('click', async () => {
     } catch (error) {
         console.error('Không thể đăng xuất:', error);
     }
+});
+
+document.getElementById('createInventoryAccountButton').addEventListener('click', () => {
+    inventoryAccountCreateError.hidden = true;
+    document.getElementById('inventoryAccountForm').reset();
+    inventoryAccountCreateDialog.showModal();
+});
+
+document.getElementById('closeInventoryAccountCreate').addEventListener('click', () => inventoryAccountCreateDialog.close());
+inventoryAccountCreateDialog.addEventListener('click', event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+});
+
+document.getElementById('inventoryAccountForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    inventoryAccountCreateError.hidden = true;
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    try {
+        const account = await api('/api/admin/inventory-accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: values.get('username'), password: values.get('password') }),
+        });
+        form.reset();
+        inventoryAccountCreateDialog.close();
+        inventoryAccountCurrentPage = 1;
+        setSaveStatus(`Đã tạo ${account.username}`);
+        await loadInventoryAccounts();
+    } catch (error) {
+        inventoryAccountCreateError.textContent = error.message;
+        inventoryAccountCreateError.hidden = false;
+    }
+});
+
+document.getElementById('closeLockInventoryAccount').addEventListener('click', () => lockInventoryAccountDialog.close());
+lockInventoryAccountDialog.addEventListener('click', event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+});
+document.getElementById('lockInventoryAccountForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (activeLockInventoryAccountId === null) return;
+    lockInventoryAccountError.hidden = true;
+    const form = event.currentTarget;
+    const reason = new FormData(form).get('reason').trim();
+    try {
+        await api(`/api/admin/inventory-accounts/${activeLockInventoryAccountId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: false, reason }),
+        });
+        lockInventoryAccountDialog.close();
+        form.reset();
+        setSaveStatus('Đã khóa tài khoản');
+        await loadInventoryAccounts();
+    } catch (error) {
+        lockInventoryAccountError.textContent = error.message;
+        lockInventoryAccountError.hidden = false;
+    }
+});
+
+document.getElementById('closeResetInventoryPassword').addEventListener('click', () => resetInventoryPasswordDialog.close());
+resetInventoryPasswordDialog.addEventListener('click', event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+});
+document.getElementById('resetInventoryPasswordForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (activeResetInventoryAccountId === null) return;
+    resetInventoryPasswordError.hidden = true;
+    const form = event.currentTarget;
+    const password = new FormData(form).get('password');
+    try {
+        await api(`/api/admin/inventory-accounts/${activeResetInventoryAccountId}/password`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        resetInventoryPasswordDialog.close();
+        form.reset();
+        setSaveStatus('Đã đặt lại mật khẩu');
+    } catch (error) {
+        resetInventoryPasswordError.textContent = error.message;
+        resetInventoryPasswordError.hidden = false;
+    }
+});
+
+inventoryAccountRows.addEventListener('click', async event => {
+    const ordersButton = event.target.closest('button[data-inventory-orders]');
+    if (ordersButton) {
+        openInventoryOrders(ordersButton.dataset.inventoryOrders, ordersButton.dataset.username);
+        return;
+    }
+    const button = event.target.closest('button[data-account-action]');
+    if (!button) return;
+    const row = button.closest('tr[data-account-id]');
+    const accountId = row.dataset.accountId;
+
+    if (button.dataset.accountAction === 'toggle' && row.dataset.active === 'true') {
+        activeLockInventoryAccountId = accountId;
+        document.getElementById('lockInventoryAccountUsername').textContent = row.dataset.username;
+        document.getElementById('lockInventoryAccountForm').reset();
+        lockInventoryAccountError.hidden = true;
+        lockInventoryAccountDialog.showModal();
+        return;
+    }
+    if (button.dataset.accountAction === 'password') {
+        activeResetInventoryAccountId = accountId;
+        document.getElementById('resetInventoryPasswordUsername').textContent = row.dataset.username;
+        document.getElementById('resetInventoryPasswordForm').reset();
+        resetInventoryPasswordError.hidden = true;
+        resetInventoryPasswordDialog.showModal();
+        return;
+    }
+
+    try {
+        if (button.dataset.accountAction === 'toggle') {
+            await api(`/api/admin/inventory-accounts/${accountId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: true }),
+            });
+            setSaveStatus('Đã mở khóa tài khoản');
+        }
+        await loadInventoryAccounts();
+    } catch (error) {
+        inventoryAccountsError.textContent = error.message;
+        inventoryAccountsError.hidden = false;
+    }
+});
+
+inventoryOrdersRows.addEventListener('click', event => {
+    const qrButton = event.target.closest('button[data-inventory-qr-waybill]');
+    if (!qrButton) return;
+    const waybill = qrButton.dataset.inventoryQrWaybill;
+    document.getElementById('inventoryOrderQrTitle').textContent = 'QR mã vận đơn';
+    document.getElementById('inventoryOrderQrValue').textContent = waybill;
+    document.getElementById('inventoryOrderQrImage').src = `/api/qrcode?text=${encodeURIComponent(waybill)}`;
+    document.getElementById('inventoryOrderQrDialog').showModal();
+});
+
+document.getElementById('inventoryOrdersDayFilter').addEventListener('click', event => {
+    const button = event.target.closest('button[data-inventory-day]');
+    if (!button || button.dataset.inventoryDay === activeInventoryOrdersDay) return;
+    setInventoryOrdersDay(button.dataset.inventoryDay);
+    inventoryOrdersCurrentPage = 1;
+    loadInventoryOrders();
+});
+
+document.getElementById('closeInventoryOrders').addEventListener('click', () => {
+    document.getElementById('inventoryOrdersDialog').close();
+});
+
+document.getElementById('inventoryOrdersDialog').addEventListener('click', event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+});
+document.getElementById('inventoryOrdersDialog').addEventListener('close', () => {
+    activeInventoryAccountId = null;
+});
+
+document.getElementById('previousInventoryOrdersPage').addEventListener('click', () => {
+    if (inventoryOrdersCurrentPage > 1) inventoryOrdersCurrentPage -= 1;
+    loadInventoryOrders();
+});
+
+document.getElementById('nextInventoryOrdersPage').addEventListener('click', () => {
+    if (inventoryOrdersCurrentPage < inventoryOrdersTotalPages) inventoryOrdersCurrentPage += 1;
+    loadInventoryOrders();
+});
+
+document.getElementById('closeInventoryOrderQr').addEventListener('click', () => {
+    document.getElementById('inventoryOrderQrDialog').close();
+});
+
+document.getElementById('inventoryOrderQrDialog').addEventListener('click', event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+});
+
+document.getElementById('inventoryOrderQrDialog').addEventListener('close', () => {
+    document.getElementById('inventoryOrderQrImage').removeAttribute('src');
 });
 
 ipRows.addEventListener('click', async event => {
@@ -628,11 +1011,19 @@ searchInput.addEventListener('input', () => {
     }, 250);
 });
 
-inventorySearchInput.addEventListener('input', () => {
-    clearTimeout(inventorySearchTimer);
-    inventorySearchTimer = setTimeout(() => {
-        inventoryCurrentPage = 1;
-        loadInventoryHistory();
+inventoryAccountSearch.addEventListener('input', () => {
+    clearTimeout(inventoryAccountSearchTimer);
+    inventoryAccountSearchTimer = setTimeout(() => {
+        inventoryAccountCurrentPage = 1;
+        loadInventoryAccounts();
+    }, 250);
+});
+
+anonymousUserSearch.addEventListener('input', () => {
+    clearTimeout(anonymousSearchTimer);
+    anonymousSearchTimer = setTimeout(() => {
+        anonymousCurrentPage = 1;
+        loadAnonymousUsers();
     }, 250);
 });
 
@@ -646,14 +1037,24 @@ document.getElementById('nextPage').addEventListener('click', () => {
     loadHistory();
 });
 
-document.getElementById('previousInventoryPage').addEventListener('click', () => {
-    if (inventoryCurrentPage > 1) inventoryCurrentPage -= 1;
-    loadInventoryHistory();
+document.getElementById('previousInventoryAccountPage').addEventListener('click', () => {
+    if (inventoryAccountCurrentPage > 1) inventoryAccountCurrentPage -= 1;
+    loadInventoryAccounts();
 });
 
-document.getElementById('nextInventoryPage').addEventListener('click', () => {
-    if (inventoryCurrentPage < inventoryTotalPages) inventoryCurrentPage += 1;
-    loadInventoryHistory();
+document.getElementById('nextInventoryAccountPage').addEventListener('click', () => {
+    if (inventoryAccountCurrentPage < inventoryAccountTotalPages) inventoryAccountCurrentPage += 1;
+    loadInventoryAccounts();
+});
+
+document.getElementById('previousAnonymousPage').addEventListener('click', () => {
+    if (anonymousCurrentPage > 1) anonymousCurrentPage -= 1;
+    loadAnonymousUsers();
+});
+
+document.getElementById('nextAnonymousPage').addEventListener('click', () => {
+    if (anonymousCurrentPage < anonymousTotalPages) anonymousCurrentPage += 1;
+    loadAnonymousUsers();
 });
 
 const viewTabs = [...document.querySelectorAll('[data-tab-target]')];
@@ -721,7 +1122,8 @@ document.getElementById('ipHistoryRows').addEventListener('click', event => {
 });
 
 loadHistory();
-loadInventoryHistory();
+loadInventoryAccounts();
+loadAnonymousUsers();
 loadIps();
 loadGeography();
 loadFormFields();
@@ -735,10 +1137,26 @@ async function loadGeography() {
         const districts = await api('/api/admin/geography');
         const districtRows = document.getElementById('districtRows');
         const communeRows = document.getElementById('communeRows');
+        const villageRows = document.getElementById('villageRows');
         const newCommuneDistrict = document.getElementById('newCommuneDistrict');
+        const newVillageCommune = document.getElementById('newVillageCommune');
         districtRows.replaceChildren();
         communeRows.replaceChildren();
+        villageRows.replaceChildren();
         newCommuneDistrict.replaceChildren();
+        newVillageCommune.replaceChildren();
+
+        const allCommunes = districts.flatMap(district => district.communes.map(commune => ({
+            ...commune,
+            districtId: district.id,
+            districtName: district.name,
+        })));
+        allCommunes.forEach(commune => {
+            const option = document.createElement('option');
+            option.value = commune.id;
+            option.textContent = `${commune.districtName} · ${commune.name}`;
+            newVillageCommune.append(option);
+        });
 
         for (const district of districts) {
             const districtOption = document.createElement('option');
@@ -855,15 +1273,75 @@ async function loadGeography() {
                 communeRow.append(communeActions);
                 if (editing) setEditingMode(communeRow, true);
                 communeRows.append(communeRow);
+
+                for (const village of commune.villages || []) {
+                    const villageRow = document.createElement('tr');
+                    villageRow.dataset.rowType = 'village';
+                    villageRow.dataset.villageId = village.id;
+                    villageRow.dataset.name = village.name;
+                    villageRow.dataset.parentCommuneId = commune.id;
+
+                    const villageNameCell = document.createElement('td');
+                    const villageNameText = document.createElement('span');
+                    villageNameText.className = 'village-name-text';
+                    villageNameText.dataset.viewControl = '';
+                    villageNameText.textContent = village.name;
+                    villageNameCell.append(villageNameText);
+                    const villageNameInput = document.createElement('input');
+                    villageNameInput.className = 'village-name';
+                    villageNameInput.dataset.editControl = '';
+                    villageNameInput.hidden = true;
+                    villageNameInput.maxLength = 80;
+                    villageNameInput.value = village.name;
+                    villageNameCell.append(villageNameInput);
+                    villageRow.append(villageNameCell);
+
+                    const villageCommuneCell = document.createElement('td');
+                    const villageCommuneText = document.createElement('span');
+                    villageCommuneText.className = 'village-commune-text';
+                    villageCommuneText.dataset.viewControl = '';
+                    villageCommuneText.textContent = commune.name;
+                    villageCommuneCell.append(villageCommuneText);
+                    const villageCommuneSelect = document.createElement('select');
+                    villageCommuneSelect.className = 'village-commune';
+                    villageCommuneSelect.dataset.editControl = '';
+                    villageCommuneSelect.hidden = true;
+                    for (const parent of allCommunes) {
+                        const option = document.createElement('option');
+                        option.value = parent.id;
+                        option.textContent = `${parent.districtName} · ${parent.name}`;
+                        villageCommuneSelect.append(option);
+                    }
+                    villageCommuneSelect.value = commune.id;
+                    villageCommuneCell.append(villageCommuneSelect);
+                    villageRow.append(villageCommuneCell);
+                    appendCell(villageRow, district.name);
+                    appendCell(villageRow, village.is_hidden ? 'Đang ẩn' : 'Đang hiện', `visibility-status${village.is_hidden ? ' hidden' : ''}`);
+
+                    const villageActions = document.createElement('td');
+                    villageActions.className = 'geography-actions';
+                    villageActions.append(createGeographyButton(
+                        village.is_hidden ? 'show-village' : 'hide-village',
+                        village.is_hidden ? 'Hiện' : 'Ẩn',
+                        '',
+                        true,
+                    ));
+                    villageActions.append(createGeographyButton('delete-village', 'Xóa', 'delete-button', true));
+                    villageRow.append(villageActions);
+                    if (editing) setEditingMode(villageRow, true);
+                    villageRows.append(villageRow);
+                }
             }
         }
 
         if (districts.length === 0) {
             appendEmptyRow(districtRows, 'Chưa có thành phố hoặc huyện.', 5);
             appendEmptyRow(communeRows, 'Chưa có xã.', 4);
+            appendEmptyRow(villageRows, 'Chưa có thôn.', 5);
         } else if (districts.every(district => district.communes.length === 0)) {
             appendEmptyRow(communeRows, 'Chưa có xã.', 4);
         }
+        if (villageRows.children.length === 0) appendEmptyRow(villageRows, 'Chưa có thôn.', 5);
     } catch (error) {
         errorMessage.textContent = error.message;
         errorMessage.hidden = false;
@@ -973,23 +1451,47 @@ document.getElementById('communeForm').addEventListener('submit', async event =>
     }
 });
 
+document.getElementById('villageForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    try {
+        const editButton = document.querySelector('[data-edit-group="geography"]');
+        if (editButton.dataset.editing === 'true' && !await saveEditGroup('geography')) return;
+        await api('/api/admin/villages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: values.get('name'), communeId: values.get('communeId') }),
+        });
+        event.currentTarget.reset();
+        showGeographyMessage('Đã thêm thôn.');
+        await loadGeography();
+    } catch (error) {
+        const message = document.getElementById('geographyError');
+        message.textContent = error.message;
+        message.hidden = false;
+    }
+});
+
 document.querySelector('.geography-section').addEventListener('click', async event => {
     const button = event.target.closest('button[data-geo-action]');
     if (!button) return;
     const row = button.closest('tr');
     const action = button.dataset.geoAction;
     const isDistrict = action.endsWith('district');
+    const isVillage = action.endsWith('village');
     const isDelete = action.startsWith('delete');
     const isVisibility = action.startsWith('hide') || action.startsWith('show');
-    const id = Number(row.dataset[isDistrict ? 'districtId' : 'communeId']);
+    const id = Number(row.dataset[isDistrict ? 'districtId' : isVillage ? 'villageId' : 'communeId']);
     const errorMessage = document.getElementById('geographyError');
     errorMessage.hidden = true;
 
     if (isDelete && !window.confirm(isDistrict
-        ? 'Xóa thành phố/huyện này cùng toàn bộ xã trực thuộc? Lịch sử tem đã tạo vẫn được giữ lại.'
-        : 'Xóa xã này? Lịch sử tem đã tạo vẫn được giữ lại.')) return;
+        ? 'Xóa thành phố/huyện này cùng toàn bộ xã/thôn trực thuộc? Lịch sử mã đã tạo vẫn được giữ lại.'
+        : isVillage
+            ? 'Xóa thôn này khỏi danh sách? Lịch sử mã đã tạo vẫn được giữ lại.'
+            : 'Xóa xã này cùng các thôn trực thuộc? Lịch sử mã đã tạo vẫn được giữ lại.')) return;
 
-    const resource = isDistrict ? 'districts' : 'communes';
+    const resource = isDistrict ? 'districts' : isVillage ? 'villages' : 'communes';
     const url = `/api/admin/${resource}/${id}${isVisibility ? '/visibility' : ''}`;
     const method = isDelete ? 'DELETE' : 'PATCH';
     let body;

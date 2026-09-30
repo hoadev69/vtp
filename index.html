@@ -69,20 +69,14 @@
             }
 
             function updateThonSelect() {
-                const communeName = document.getElementById('xa0').value;
+                const selectedDistrict = geography.find(item => item.name === document.getElementById('huyen0').value);
+                const selectedCommune = selectedDistrict?.communes.find(item => item.name === document.getElementById('xa0').value);
                 const villageSelect = document.getElementById('thon0');
-                const villagesByCommune = {
-                    'Gia Phú': ['Thôn Nậm Hẻn', 'Thôn Đông Căm', 'Thôn Hùng Thắng', 'Thôn Phú Xuân', 'Thôn Bến Phà', 'Thôn Chính Tiến', 'Thôn Soi Cờ', 'Thôn Soi Giá', 'Thôn Đồng Lục', 'Bản Bay', 'Thôn Xuân Tư'],
-                    'Thống Nhất': ['Thôn Hòa Lạc', 'Thôn Thái Bo', 'Thôn Giao Ngay', 'Thôn Giao Tiến', 'Thôn Tiến Cường', 'Thôn Tân Tiến', 'Thôn Tiến Thắng', 'Thôn Muồng', 'Thôn Chang', 'Phú Hùng', 'Thôn Mường Bát', 'Bản Cam', 'Thôn Khe Luộc', 'Thôn Kắp kẹ', 'Thôn An Thành'],
-                    'Xuân Giao': ['Thôn Chành', 'Thôn Hùng Xuân', 'Thôn Tiến Lợi', 'Thôn Giao Bình', 'Thôn Mường', 'Thôn Phẻo', 'Thôn Vàng', 'Thôn Tiến Lợi', 'Thôn Hợp Giao'],
-                    'Phú Nhuận': ['Phú Thịnh 1', 'Phú Thịnh 2', 'Phú Thịnh 3', 'Phú An 1', 'Phú An 2', 'Tân Lập', 'Phú Sơn', 'Làng Đền', 'Khe Bá', 'Phú Hải 2', 'Phú Hải 3', 'Nhuần 2', 'Nhuần 3'],
-                };
-
                 villageSelect.replaceChildren();
-                (villagesByCommune[communeName] || []).forEach(village => {
+                (selectedCommune?.villages || []).forEach(village => {
                     const option = document.createElement('option');
-                    option.value = village;
-                    option.textContent = village;
+                    option.value = village.name;
+                    option.textContent = village.name;
                     villageSelect.appendChild(option);
                 });
             }
