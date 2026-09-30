@@ -509,12 +509,32 @@ async function loadIps() {
     }
 }
 
-fetch('/api/admin/me').then(response => {
-    if (!response.ok) throw new Error('Phiên quản trị đã hết hạn.');
+function showAdminInitError(message) {
+    let banner = document.getElementById('adminInitError');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'adminInitError';
+        banner.style.cssText = 'background:#fee;color:#900;padding:12px;margin:12px 0;border:1px solid #900;font-family:monospace;white-space:pre-wrap;';
+        document.body.prepend(banner);
+    }
+    banner.textContent = message;
+}
+
+fetch('/api/admin/me').then(async response => {
+    if (response.status === 401) {
+        throw new Error('API /api/admin/me trả HTTP 401 - session không được xác thực.');
+    }
+    if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(`/api/admin/me trả HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+    }
     return response.json();
 }).then(admin => {
-    document.getElementById('adminName').textContent = admin.username;
-}).catch(() => window.location.assign('/admin'));
+    if (admin) document.getElementById('adminName').textContent = admin.username;
+}).catch(error => {
+    console.error('Lỗi khởi tạo trang quản trị:', error);
+    showAdminInitError(error.message || 'Lỗi không xác định khi tải /api/admin/me.');
+});
 
 document.getElementById('logoutButton').addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' });
