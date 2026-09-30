@@ -36,6 +36,7 @@
 
         <nav class="view-tabs" role="tablist" aria-label="Khu vực quản trị">
             <button id="historyTab" class="view-tab active" type="button" role="tab" aria-selected="true" aria-controls="historyPanel" data-tab-target="historyPanel">Lịch sử</button>
+            <button id="inventoryTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="inventoryPanel" data-tab-target="inventoryPanel">Kiểm kê</button>
             <button id="ipsTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="ipsPanel" data-tab-target="ipsPanel">Địa chỉ IP</button>
             <button id="geographyTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="geographyPanel" data-tab-target="geographyPanel">Địa bàn</button>
             <button id="fieldsTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="formFieldsPanel" data-tab-target="formFieldsPanel">Trường nhập</button>
@@ -71,6 +72,30 @@
                 <button id="previousPage" type="button">Trang trước</button>
                 <span id="pageLabel"></span>
                 <button id="nextPage" type="button">Trang sau</button>
+            </div>
+        </section>
+
+        <section id="inventoryPanel" class="tab-panel" role="tabpanel" aria-labelledby="inventoryTab" hidden>
+            <div class="section-heading">
+                <h2>Lịch sử mã kiểm kê</h2>
+                <label class="search-field">
+                    <span>Tìm mã vận đơn hoặc IP</span>
+                    <input id="inventorySearchInput" type="search" placeholder="Mã vận đơn hoặc IP..." autocomplete="off">
+                </label>
+            </div>
+            <p id="inventoryHistoryError" class="error-message" role="alert" hidden></p>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr><th>Thời gian</th><th>IP</th><th>Mã vận đơn</th></tr>
+                    </thead>
+                    <tbody id="inventoryHistoryRows"></tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button id="previousInventoryPage" type="button">Trang trước</button>
+                <span id="inventoryPageLabel"></span>
+                <button id="nextInventoryPage" type="button">Trang sau</button>
             </div>
         </section>
 

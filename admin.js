@@ -1,11 +1,17 @@
 const historyRows = document.getElementById('historyRows');
+const inventoryHistoryRows = document.getElementById('inventoryHistoryRows');
 const ipRows = document.getElementById('ipRows');
 const historyError = document.getElementById('historyError');
+const inventoryHistoryError = document.getElementById('inventoryHistoryError');
 const ipError = document.getElementById('ipError');
 const searchInput = document.getElementById('searchInput');
+const inventorySearchInput = document.getElementById('inventorySearchInput');
 let currentPage = 1;
 let totalPages = 1;
+let inventoryCurrentPage = 1;
+let inventoryTotalPages = 1;
 let searchTimer;
+let inventorySearchTimer;
 let showBlockedOnly = false;
 const recreationEntries = new Map();
 
@@ -429,6 +435,42 @@ async function loadHistory() {
     }
 }
 
+async function loadInventoryHistory() {
+    inventoryHistoryError.hidden = true;
+    const query = new URLSearchParams({
+        page: String(inventoryCurrentPage),
+        search: inventorySearchInput.value.trim(),
+    });
+    try {
+        const result = await api(`/api/admin/kiemke-history?${query}`);
+        inventoryTotalPages = result.pages;
+        document.getElementById('inventoryPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} mã`;
+        document.getElementById('previousInventoryPage').disabled = result.page <= 1;
+        document.getElementById('nextInventoryPage').disabled = result.page >= result.pages;
+        inventoryHistoryRows.replaceChildren();
+
+        if (result.rows.length === 0) {
+            const row = document.createElement('tr');
+            const cell = appendCell(row, 'Chưa có lịch sử kiểm kê phù hợp.');
+            cell.colSpan = 3;
+            cell.className = 'empty-row';
+            inventoryHistoryRows.append(row);
+            return;
+        }
+
+        for (const entry of result.rows) {
+            const row = document.createElement('tr');
+            appendCell(row, formatDate(entry.created_at));
+            appendCell(row, entry.ip === 'unknown' ? 'Chưa ghi nhận IP' : entry.ip);
+            appendCell(row, entry.waybill);
+            inventoryHistoryRows.append(row);
+        }
+    } catch (error) {
+        inventoryHistoryError.textContent = error.message;
+        inventoryHistoryError.hidden = false;
+    }
+}
+
 async function loadIps() {
     ipError.hidden = true;
     try {
@@ -582,6 +624,14 @@ searchInput.addEventListener('input', () => {
     }, 250);
 });
 
+inventorySearchInput.addEventListener('input', () => {
+    clearTimeout(inventorySearchTimer);
+    inventorySearchTimer = setTimeout(() => {
+        inventoryCurrentPage = 1;
+        loadInventoryHistory();
+    }, 250);
+});
+
 document.getElementById('previousPage').addEventListener('click', () => {
     if (currentPage > 1) currentPage -= 1;
     loadHistory();
@@ -590,6 +640,16 @@ document.getElementById('previousPage').addEventListener('click', () => {
 document.getElementById('nextPage').addEventListener('click', () => {
     if (currentPage < totalPages) currentPage += 1;
     loadHistory();
+});
+
+document.getElementById('previousInventoryPage').addEventListener('click', () => {
+    if (inventoryCurrentPage > 1) inventoryCurrentPage -= 1;
+    loadInventoryHistory();
+});
+
+document.getElementById('nextInventoryPage').addEventListener('click', () => {
+    if (inventoryCurrentPage < inventoryTotalPages) inventoryCurrentPage += 1;
+    loadInventoryHistory();
 });
 
 const viewTabs = [...document.querySelectorAll('[data-tab-target]')];
@@ -657,6 +717,7 @@ document.getElementById('ipHistoryRows').addEventListener('click', event => {
 });
 
 loadHistory();
+loadInventoryHistory();
 loadIps();
 loadGeography();
 loadFormFields();

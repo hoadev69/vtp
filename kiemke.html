@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#173d35">
+    <title>Kiểm kê | VTP</title>
+    <link rel="stylesheet" href="/kiemke.css">
+    <script src="/kiemke.js" defer></script>
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/">VTP <span>KIỂM KÊ</span></a>
+        <nav aria-label="Điều hướng">
+            <a href="/">Tạo tem</a>
+            <a href="/admin">Quản trị</a>
+        </nav>
+    </header>
+    <main>
+        <button id="createQrButton" class="clipboard-button" type="button">Lấy mã từ clipboard</button>
+        <p id="formError" class="error-message" role="alert" hidden></p>
+    </main>
+    <dialog id="qrDialog" aria-label="Mã QR vận đơn">
+        <button id="closeQrDialog" class="close-button" type="button" aria-label="Đóng">×</button>
+        <img id="qrImage" alt="Mã QR">
+    </dialog>
+</body>
+</html>

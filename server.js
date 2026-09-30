@@ -186,6 +186,14 @@ app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/
     res.sendFile(path.join(__dirname, req.path.slice(1)));
 });
 
+app.get('/kiemke', blockIfIpBlocked, (req, res) => {
+    res.sendFile(path.join(__dirname, 'kiemke.html'));
+});
+
+app.get(['/kiemke.css', '/kiemke.js'], (req, res) => {
+    res.sendFile(path.join(__dirname, req.path.slice(1)));
+});
+
 app.post('/api/login', loginRateLimit, async (req, res) => {
     const body = req.body || {};
     const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
@@ -248,6 +256,26 @@ app.post('/api/history', blockIfIpBlocked, generationRateLimit, (req, res) => {
     );
 
     res.status(201).json({ id: result.lastInsertRowid, fields });
+});
+
+app.post('/api/kiemke', blockIfIpBlocked, generationRateLimit, async (req, res) => {
+    const waybill = req.body?.waybill;
+    if (typeof waybill !== 'string' || waybill.trim().length === 0 || waybill.length > maxTextLength) {
+        return res.status(400).json({ error: 'Mã vận đơn không hợp lệ.' });
+    }
+
+    let qrCode;
+    try {
+        qrCode = await QRCode.toDataURL(waybill.trim(), { width: 260, margin: 1 });
+    } catch {
+        return res.status(400).json({ error: 'Không thể tạo QR từ mã vận đơn này.' });
+    }
+
+    const result = database.prepare(`
+        INSERT INTO inventory_history (ip, waybill, created_at) VALUES (?, ?, ?)
+    `).run(req.clientIp, waybill.trim(), new Date().toISOString());
+
+    res.status(201).json({ id: result.lastInsertRowid, qrCode });
 });
 
 app.get('/api/barcode', blockIfIpBlocked, generationRateLimit, async (req, res) => {
@@ -479,6 +507,31 @@ app.get('/api/admin/history', requireAdmin, (req, res) => {
         LIMIT ? OFFSET ?
     `).all(...values, limit, (page - 1) * limit)
         .map(({ field_values: fieldValues, ...row }) => ({ ...row, fields: parseFieldValues(fieldValues) }));
+
+    res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
+});
+
+app.get('/api/admin/kiemke-history', requireAdmin, (req, res) => {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = 50;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+    const values = [];
+    let where = '';
+
+    if (search) {
+        where = 'WHERE waybill LIKE ? OR ip LIKE ?';
+        const query = `%${search}%`;
+        values.push(query, query);
+    }
+
+    const total = database.prepare(`SELECT COUNT(*) AS count FROM inventory_history ${where}`)
+        .get(...values).count;
+    const rows = database.prepare(`
+        SELECT id, ip, waybill, created_at
+        FROM inventory_history ${where}
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+    `).all(...values, limit, (page - 1) * limit);
 
     res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
 });

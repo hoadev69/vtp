@@ -63,6 +63,14 @@ database.exec(`
         expires_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS inventory_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip TEXT NOT NULL,
+        waybill TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS inventory_history_created_at_idx ON inventory_history(created_at DESC);
 `);
 
 for (const [table, column] of [['districts', 'is_hidden'], ['communes', 'is_hidden']]) {

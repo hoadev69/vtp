@@ -1,0 +1,79 @@
+:root {
+    font-family: Arial, sans-serif;
+    color: #19342e;
+    background: #f4f7f5;
+    font-synthesis: none;
+    --ink: #19342e;
+    --muted: #687973;
+    --line: #dce5df;
+    --green: #14745b;
+    --green-dark: #0f5947;
+}
+
+* { box-sizing: border-box; }
+body { min-width: 320px; min-height: 100vh; margin: 0; }
+a, button { font: inherit; }
+a:focus-visible, button:focus-visible { outline: 3px solid #e5ae42; outline-offset: 3px; }
+.topbar {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 max(4vw, calc((100vw - 1040px) / 2));
+    color: #fff;
+    background: #173d35;
+}
+.brand { color: #fff; font-size: 18px; font-weight: 800; text-decoration: none; }
+.brand span { margin-left: 9px; color: #b8d6ca; font-size: 10px; font-weight: 700; }
+nav { display: flex; gap: 20px; }
+nav a { color: #dce9e2; font-size: 12px; text-decoration: none; }
+nav a:hover { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+main { width: min(560px, 90vw); margin: clamp(72px, 18vh, 170px) auto 0; }
+button {
+    min-height: 52px;
+    padding: 0 22px;
+    border: 1px solid var(--green);
+    border-radius: 3px;
+    color: #fff;
+    background: var(--green);
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--green-dark); background: var(--green-dark); }
+button:disabled { cursor: wait; opacity: .65; }
+.clipboard-button { display: block; width: min(100%, 320px); margin: 0 auto; }
+.error-message { margin: 12px 0 0; color: #a32626; font-size: 13px; text-align: center; }
+#qrDialog {
+    position: relative;
+    width: min(340px, 90vw);
+    max-width: 90vw;
+    padding: 38px 24px 24px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 18px 60px #152f2540;
+}
+#qrDialog::backdrop { background: #112c2480; }
+#qrImage { display: block; width: min(260px, 100%); aspect-ratio: 1; height: auto; margin: 0 auto; image-rendering: pixelated; }
+.close-button {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border: 0;
+    color: var(--muted);
+    background: transparent;
+    font-size: 24px;
+    line-height: 1;
+}
+.close-button:hover:not(:disabled) { color: var(--ink); background: #edf2ee; }
+@media (max-width: 480px) {
+    .topbar { padding: 0 5vw; }
+    nav { gap: 12px; }
+    main { margin-top: 19vh; }
+}
