@@ -2,12 +2,14 @@ require('dotenv').config();
 
 const express = require('express');
 const session = require('express-session');
+const { rateLimit } = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const bwipjs = require('bwip-js');
 const QRCode = require('qrcode');
 const path = require('node:path');
 const net = require('node:net');
 const database = require('./database');
+const SQLiteSessionStore = require('./session-store');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -43,6 +45,7 @@ app.use(express.json({ limit: '16kb' }));
 app.use(session({
     name: 'vtp.sid',
     secret: sessionSecret,
+    store: new SQLiteSessionStore(database),
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -52,6 +55,31 @@ app.use(session({
         maxAge: 8 * 60 * 60 * 1000,
     },
 }));
+
+const loginRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: 'Quá nhiều lần đăng nhập không thành công. Vui lòng thử lại sau 15 phút.' },
+});
+const generationRateLimit = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Đã vượt quá giới hạn tạo mã. Vui lòng thử lại sau.' },
+});
+
+app.get('/healthz', (req, res) => {
+    try {
+        database.prepare('SELECT 1').get();
+        res.json({ status: 'ok' });
+    } catch {
+        res.status(503).json({ status: 'unavailable' });
+    }
+});
 
 function getClientIp(req) {
     let ip = req.ip || req.socket.remoteAddress || '';
@@ -158,7 +186,7 @@ app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/
     res.sendFile(path.join(__dirname, req.path.slice(1)));
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginRateLimit, async (req, res) => {
     const body = req.body || {};
     const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
     const password = typeof body.password === 'string' ? body.password : '';
@@ -188,7 +216,7 @@ app.post('/api/logout', requireAdmin, (req, res, next) => {
     });
 });
 
-app.post('/api/history', blockIfIpBlocked, (req, res) => {
+app.post('/api/history', blockIfIpBlocked, generationRateLimit, (req, res) => {
     const { barcode, chonHuyen, chonXa, chonThon, fields: submittedFields = {} } = req.body || {};
     if (typeof barcode !== 'string' || barcode.trim().length === 0 || barcode.length > maxTextLength) {
         return res.status(400).json({ error: 'Mã vạch không hợp lệ.' });
@@ -222,7 +250,7 @@ app.post('/api/history', blockIfIpBlocked, (req, res) => {
     res.status(201).json({ id: result.lastInsertRowid, fields });
 });
 
-app.get('/api/barcode', blockIfIpBlocked, async (req, res) => {
+app.get('/api/barcode', blockIfIpBlocked, generationRateLimit, async (req, res) => {
     const text = getText(req, res);
     if (text === null) return;
 
@@ -240,7 +268,7 @@ app.get('/api/barcode', blockIfIpBlocked, async (req, res) => {
     }
 });
 
-app.get('/api/qrcode', blockIfIpBlocked, async (req, res) => {
+app.get('/api/qrcode', blockIfIpBlocked, generationRateLimit, async (req, res) => {
     const text = getText(req, res);
     if (text === null) return;
 

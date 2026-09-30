@@ -2,10 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Database = require('better-sqlite3');
 
-const dataDirectory = path.join(__dirname, 'data');
-fs.mkdirSync(dataDirectory, { recursive: true });
+const databasePath = path.resolve(process.env.DATABASE_PATH || path.join(__dirname, 'data', 'history.sqlite'));
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 
-const database = new Database(path.join(dataDirectory, 'history.sqlite'));
+const database = new Database(databasePath);
 database.pragma('journal_mode = WAL');
 database.pragma('foreign_keys = ON');
 database.exec(`
@@ -56,6 +56,13 @@ database.exec(`
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+        sid TEXT PRIMARY KEY,
+        session TEXT NOT NULL,
+        expires_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
 `);
 
 for (const [table, column] of [['districts', 'is_hidden'], ['communes', 'is_hidden']]) {

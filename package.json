@@ -7,11 +7,12 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "bwip-js": "^4.7.0",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.2.0",
+    "bwip-js": "^4.7.0",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.7.0",
     "express-session": "^1.18.2",
     "qrcode": "^1.5.4"
   },

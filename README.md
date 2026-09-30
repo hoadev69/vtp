@@ -14,4 +14,8 @@ Người dùng mở trang chủ để tạo mã không cần đăng nhập. Mở
 
 Dữ liệu nằm trong `data/history.sqlite` và được giữ qua các lần khởi động. Bản ghi lịch sử cũ được giữ lại nhưng IP hiển thị là `unknown`, vì trước đây hệ thống chưa ghi nhận địa chỉ IP.
 
-Khi chạy sau reverse proxy, đặt `TRUST_PROXY_HOPS` bằng số proxy đáng tin cậy đứng trước Node server để Express ghi nhận đúng IP thật; không bật tin cậy proxy nếu chưa kiểm soát proxy đó. Phiên admin lưu trong bộ nhớ và cần đăng nhập lại sau khi server khởi động lại.
+Có thể đặt `DATABASE_PATH` để dùng đường dẫn DB khác; trên nền tảng có ổ đĩa tạm thời, cần mount ổ đĩa bền vững và trỏ biến này vào đó. Sao lưu SQLite cùng các file `-wal`/`-shm` bằng công cụ SQLite phù hợp hoặc sau khi dừng ứng dụng. Phiên đăng nhập được lưu trong cùng DB và tự hết hạn sau 8 giờ. Giữ `SESSION_SECRET` ổn định giữa các lần triển khai để phiên hiện tại tiếp tục hợp lệ.
+
+`/healthz` trả HTTP 200 khi ứng dụng truy vấn được SQLite và 503 khi DB không khả dụng. Đặt endpoint này làm health check của nền tảng triển khai. Đăng nhập bị giới hạn 10 lần sai trong 15 phút; các endpoint tạo/lưu mã bị giới hạn tổng cộng 120 yêu cầu mỗi phút trên mỗi IP.
+
+Khi chạy sau reverse proxy, đặt `TRUST_PROXY_HOPS` bằng số proxy đáng tin cậy đứng trước Node server để Express ghi nhận đúng IP thật; không bật tin cậy proxy nếu chưa kiểm soát proxy đó. SQLite phù hợp cho một máy chủ/instance với ổ đĩa bền vững. Bộ đếm rate limit hiện nằm trong bộ nhớ tiến trình nên reset khi restart và không chia sẻ giữa các instance; triển khai nhiều instance cần hệ quản trị DB cùng store dùng chung cho session và rate limit thay vì các file SQLite cục bộ.

@@ -21,6 +21,38 @@
         "/^node --check server\\.js && node --check database\\.js && node --check login\\.js && node --check admin\\.js$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^node -e 'const net = require\\(\"node:net\"\\); const server = net\\.createServer\\(\\); server\\.listen\\(\"0\", \\(\\) => \\{ console\\.log\\(JSON\\.stringify\\(server\\.address\\(\\)\\)\\); server\\.close\\(\\); \\}\\);'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --version && npm --version && npm ls --depth=0$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^npm audit --omit=dev$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^npm ls --depth=0 && node --version && npm --version$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node <<'NODE'\nconst assert = require\\('node:assert/strict'\\);\nconst fs = require\\('node:fs'\\);\nconst os = require\\('node:os'\\);\nconst path = require\\('node:path'\\);\n\n\\(async \\(\\) => \\{\n    const directory = fs\\.mkdtempSync\\(path\\.join\\(os\\.tmpdir\\(\\), 'vtp-session-test-'\\)\\);\n    process\\.env\\.DATABASE_PATH = path\\.join\\(directory, 'test\\.sqlite'\\);\n    const database = require\\('\\./database'\\);\n    const SQLiteSessionStore = require\\('\\./session-store'\\);\n    const firstStore = new SQLiteSessionStore\\(database\\);\n    const call = \\(store, method, \\.\\.\\.args\\) => new Promise\\(\\(resolve, reject\\) => \\{\n        store\\[method\\]\\(\\.\\.\\.args, \\(error, value\\) => error \\? reject\\(error\\) : resolve\\(value\\)\\);\n    \\}\\);\n\n    try \\{\n        const sessionData = \\{ cookie: \\{ expires: new Date\\(Date\\.now\\(\\) \\+ 60000\\) \\}, user: \\{ id: 7 \\} \\};\n        await call\\(firstStore, 'set', 'persisted-session', sessionData\\);\n        const storeAfterRestart = new SQLiteSessionStore\\(database\\);\n        assert\\.deepEqual\\(await call\\(storeAfterRestart, 'get', 'persisted-session'\\), sessionData\\);\n\n        await call\\(storeAfterRestart, 'set', 'expired-session', \\{\n            cookie: \\{ expires: new Date\\(Date\\.now\\(\\) - 1000\\) \\},\n        \\}\\);\n        assert\\.equal\\(await call\\(storeAfterRestart, 'get', 'expired-session'\\), null\\);\n        await call\\(storeAfterRestart, 'destroy', 'persisted-session'\\);\n        assert\\.equal\\(await call\\(storeAfterRestart, 'get', 'persisted-session'\\), null\\);\n        clearInterval\\(firstStore\\.cleanupTimer\\);\n        clearInterval\\(storeAfterRestart\\.cleanupTimer\\);\n        database\\.close\\(\\);\n        fs\\.rmSync\\(directory, \\{ recursive: true, force: true \\}\\);\n        console\\.log\\('SQLite session store persistence, expiry, and destroy: OK'\\);\n    \\} catch \\(error\\) \\{\n        clearInterval\\(firstStore\\.cleanupTimer\\);\n        database\\.close\\(\\);\n        fs\\.rmSync\\(directory, \\{ recursive: true, force: true \\}\\);\n        throw error;\n    \\}\n\\}\\)\\(\\)\\.catch\\(error => \\{\n    console\\.error\\(error\\);\n    process\\.exitCode = 1;\n\\}\\);\nNODE$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node <<'NODE'\nconst assert = require\\('node:assert/strict'\\);\nconst fs = require\\('node:fs'\\);\nconst os = require\\('node:os'\\);\nconst path = require\\('node:path'\\);\n\n\\(async \\(\\) => \\{\n    const directory = fs\\.mkdtempSync\\(path\\.join\\(os\\.tmpdir\\(\\), 'vtp-session-test-'\\)\\);\n    process\\.env\\.DATABASE_PATH = path\\.join\\(directory, 'test\\.sqlite'\\);\n    const database = require\\('\\./database'\\);\n    const SQLiteSessionStore = require\\('\\./session-store'\\);\n    const firstStore = new SQLiteSessionStore\\(database\\);\n    const call = \\(store, method, \\.\\.\\.args\\) => new Promise\\(\\(resolve, reject\\) => \\{\n        store\\[method\\]\\(\\.\\.\\.args, \\(error, value\\) => error \\? reject\\(error\\) : resolve\\(value\\)\\);\n    \\}\\);\n\n    try \\{\n        const expiry = Date\\.now\\(\\) \\+ 60000;\n        const sessionData = \\{ cookie: \\{ expires: new Date\\(expiry\\) \\}, user: \\{ id: 7 \\} \\};\n        await call\\(firstStore, 'set', 'persisted-session', sessionData\\);\n        const storeAfterRestart = new SQLiteSessionStore\\(database\\);\n        const rawSession = await call\\(storeAfterRestart, 'get', 'persisted-session'\\);\n        const loadedSession = storeAfterRestart\\.createSession\\(\\{\n            sessionID: 'persisted-session',\n            sessionStore: storeAfterRestart,\n        \\}, rawSession\\);\n        assert\\.equal\\(loadedSession\\.user\\.id, 7\\);\n        assert\\.equal\\(loadedSession\\.cookie\\.expires\\.getTime\\(\\), expiry\\);\n\n        await call\\(storeAfterRestart, 'set', 'expired-session', \\{\n            cookie: \\{ expires: new Date\\(Date\\.now\\(\\) - 1000\\) \\},\n        \\}\\);\n        assert\\.equal\\(await call\\(storeAfterRestart, 'get', 'expired-session'\\), null\\);\n        await call\\(storeAfterRestart, 'destroy', 'persisted-session'\\);\n        assert\\.equal\\(await call\\(storeAfterRestart, 'get', 'persisted-session'\\), null\\);\n        clearInterval\\(firstStore\\.cleanupTimer\\);\n        clearInterval\\(storeAfterRestart\\.cleanupTimer\\);\n        database\\.close\\(\\);\n        fs\\.rmSync\\(directory, \\{ recursive: true, force: true \\}\\);\n        console\\.log\\('SQLite session persistence, cookie expiry, and destroy: OK'\\);\n    \\} catch \\(error\\) \\{\n        clearInterval\\(firstStore\\.cleanupTimer\\);\n        database\\.close\\(\\);\n        fs\\.rmSync\\(directory, \\{ recursive: true, force: true \\}\\);\n        throw error;\n    \\}\n\\}\\)\\(\\)\\.catch\\(error => \\{\n    console\\.error\\(error\\);\n    process\\.exitCode = 1;\n\\}\\);\nNODE$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check server\\.js && node --check database\\.js && node --check session-store\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check session-store\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }
