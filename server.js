@@ -167,6 +167,9 @@ app.post('/api/login', async (req, res) => {
         req.session.regenerate(error => error ? reject(error) : resolve());
     });
     req.session.user = { id: user.id, username: user.username, role: user.role };
+    await new Promise((resolve, reject) => {
+        req.session.save(error => error ? reject(error) : resolve());
+    });
     res.json({ username: user.username });
 });
 
