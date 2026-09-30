@@ -20,10 +20,10 @@ const maxTextLength = 512;
 const trustProxyHops = Math.max(0, Number.parseInt(process.env.TRUST_PROXY_HOPS, 10) || 0);
 
 if (!/^[a-z0-9._-]{3,32}$/.test(adminUsername)
-    || adminPassword.length < 12
+    || adminPassword.length < 6
     || Buffer.byteLength(adminPassword, 'utf8') > 72
     || sessionSecret.length < 32) {
-    console.error('Cần ADMIN_USERNAME hợp lệ, ADMIN_PASSWORD từ 12 ký tự và SESSION_SECRET tối thiểu 32 ký tự.');
+    console.error('Cần ADMIN_USERNAME hợp lệ, ADMIN_PASSWORD từ 6 ký tự và SESSION_SECRET tối thiểu 32 ký tự.');
     process.exit(1);
 }
 
