@@ -6,6 +6,7 @@ const { rateLimit } = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const bwipjs = require('bwip-js');
 const QRCode = require('qrcode');
+const { createHash, randomUUID } = require('node:crypto');
 const path = require('node:path');
 const net = require('node:net');
 const database = require('./database');
@@ -18,6 +19,12 @@ const adminPassword = process.env.ADMIN_PASSWORD || '';
 const sessionSecret = process.env.SESSION_SECRET || '';
 const maxTextLength = 512;
 const trustProxyHops = Math.max(0, Number.parseInt(process.env.TRUST_PROXY_HOPS, 10) || 0);
+const anonymousCookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+};
 
 if (!/^[a-z0-9._-]{3,32}$/.test(adminUsername)
     || adminPassword.length < 6
@@ -85,6 +92,90 @@ function getClientIp(req) {
     let ip = req.ip || req.socket.remoteAddress || '';
     if (ip.startsWith('::ffff:')) ip = ip.slice(7);
     return net.isIP(ip) ? ip : 'unknown';
+}
+
+function readCookie(req, name) {
+    for (const item of (req.headers.cookie || '').split(';')) {
+        const separator = item.indexOf('=');
+        if (separator < 0 || item.slice(0, separator).trim() !== name) continue;
+        try {
+            return decodeURIComponent(item.slice(separator + 1).trim());
+        } catch {
+            return '';
+        }
+    }
+    return '';
+}
+
+function isValidAnonymousToken(value, prefix) {
+    return typeof value === 'string'
+        && value.startsWith(`${prefix}_`)
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.slice(2));
+}
+
+function hashAnonymousSessionId(value) {
+    return createHash('sha256').update(value).digest('hex');
+}
+
+const getAnonymousSession = database.prepare(
+    'SELECT anonymous_user_id FROM anonymous_sessions WHERE id = ?',
+);
+const recordAnonymousActivity = database.transaction((userId, sessionId, ip, timestamp) => {
+    database.prepare(`
+        INSERT INTO anonymous_users (id, first_seen_at, last_seen_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET last_seen_at = excluded.last_seen_at
+    `).run(userId, timestamp, timestamp);
+    database.prepare(`
+        INSERT INTO anonymous_sessions (id, anonymous_user_id, first_seen_at, last_seen_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET last_seen_at = excluded.last_seen_at
+    `).run(sessionId, userId, timestamp, timestamp);
+    database.prepare(`
+        INSERT INTO anonymous_user_ips (anonymous_user_id, ip, first_seen_at, last_seen_at, request_count)
+        VALUES (?, ?, ?, ?, 1)
+        ON CONFLICT(anonymous_user_id, ip) DO UPDATE SET
+            last_seen_at = excluded.last_seen_at,
+            request_count = anonymous_user_ips.request_count + 1
+    `).run(userId, ip, timestamp, timestamp);
+});
+
+function identifyAnonymousUser(req, res, next) {
+    let userId = readCookie(req, 'vtp.uid');
+    const hasUserCookie = isValidAnonymousToken(userId, 'u');
+    if (!hasUserCookie) userId = `u_${randomUUID()}`;
+
+    let anonymousSessionId = readCookie(req, 'vtp.anon.sid');
+    let hasSessionCookie = isValidAnonymousToken(anonymousSessionId, 's');
+    if (!hasSessionCookie) anonymousSessionId = `s_${randomUUID()}`;
+
+    let anonymousSessionKey = hashAnonymousSessionId(anonymousSessionId);
+    const existingSession = hasSessionCookie ? getAnonymousSession.get(anonymousSessionKey) : null;
+    if (existingSession && existingSession.anonymous_user_id !== userId) {
+        anonymousSessionId = `s_${randomUUID()}`;
+        anonymousSessionKey = hashAnonymousSessionId(anonymousSessionId);
+        hasSessionCookie = false;
+    }
+
+    try {
+        const timestamp = new Date().toISOString();
+        recordAnonymousActivity(userId, anonymousSessionKey, req.clientIp || getClientIp(req), timestamp);
+
+        if (!hasUserCookie) {
+            res.cookie('vtp.uid', userId, {
+                ...anonymousCookieOptions,
+                maxAge: 365 * 24 * 60 * 60 * 1000,
+            });
+        }
+        if (!hasSessionCookie) {
+            res.cookie('vtp.anon.sid', anonymousSessionId, anonymousCookieOptions);
+        }
+        req.anonymousUserId = userId;
+        req.anonymousSessionId = anonymousSessionId;
+        next();
+    } catch (error) {
+        next(error);
+    }
 }
 
 function blockIfIpBlocked(req, res, next) {
@@ -168,11 +259,11 @@ function parseFieldValues(value) {
 
 app.get('/login', (req, res) => res.redirect('/admin'));
 
-app.get(['/', '/index.html'], blockIfIpBlocked, (req, res) => {
+app.get(['/', '/index.html'], blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.get('/ketqua.html', blockIfIpBlocked, (req, res) => {
+app.get('/ketqua.html', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
     res.sendFile(path.join(__dirname, 'ketqua.html'));
 });
 
@@ -186,7 +277,7 @@ app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/
     res.sendFile(path.join(__dirname, req.path.slice(1)));
 });
 
-app.get('/kiemke', blockIfIpBlocked, (req, res) => {
+app.get('/kiemke', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
     res.sendFile(path.join(__dirname, 'kiemke.html'));
 });
 
@@ -224,7 +315,7 @@ app.post('/api/logout', requireAdmin, (req, res, next) => {
     });
 });
 
-app.post('/api/history', blockIfIpBlocked, generationRateLimit, (req, res) => {
+app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRateLimit, (req, res) => {
     const { barcode, chonHuyen, chonXa, chonThon, fields: submittedFields = {} } = req.body || {};
     if (typeof barcode !== 'string' || barcode.trim().length === 0 || barcode.length > maxTextLength) {
         return res.status(400).json({ error: 'Mã vạch không hợp lệ.' });
@@ -243,8 +334,8 @@ app.post('/api/history', blockIfIpBlocked, generationRateLimit, (req, res) => {
     }));
 
     const result = database.prepare(`
-        INSERT INTO history (ip, barcode, district, commune, village, field_values, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO history (ip, barcode, district, commune, village, field_values, created_at, anonymous_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         req.clientIp,
         barcode.trim(),
@@ -253,12 +344,13 @@ app.post('/api/history', blockIfIpBlocked, generationRateLimit, (req, res) => {
         chonThon,
         JSON.stringify(fields),
         new Date().toISOString(),
+        req.anonymousUserId,
     );
 
     res.status(201).json({ id: result.lastInsertRowid, fields });
 });
 
-app.post('/api/kiemke', blockIfIpBlocked, generationRateLimit, async (req, res) => {
+app.post('/api/kiemke', blockIfIpBlocked, identifyAnonymousUser, generationRateLimit, async (req, res) => {
     const waybill = req.body?.waybill;
     if (typeof waybill !== 'string' || waybill.trim().length === 0 || waybill.length > maxTextLength) {
         return res.status(400).json({ error: 'Mã vận đơn không hợp lệ.' });
@@ -272,13 +364,13 @@ app.post('/api/kiemke', blockIfIpBlocked, generationRateLimit, async (req, res) 
     }
 
     const result = database.prepare(`
-        INSERT INTO inventory_history (ip, waybill, created_at) VALUES (?, ?, ?)
-    `).run(req.clientIp, waybill.trim(), new Date().toISOString());
+        INSERT INTO inventory_history (ip, waybill, created_at, anonymous_user_id) VALUES (?, ?, ?, ?)
+    `).run(req.clientIp, waybill.trim(), new Date().toISOString(), req.anonymousUserId);
 
     res.status(201).json({ id: result.lastInsertRowid, qrCode });
 });
 
-app.get('/api/barcode', blockIfIpBlocked, generationRateLimit, async (req, res) => {
+app.get('/api/barcode', blockIfIpBlocked, identifyAnonymousUser, generationRateLimit, async (req, res) => {
     const text = getText(req, res);
     if (text === null) return;
 
@@ -296,7 +388,7 @@ app.get('/api/barcode', blockIfIpBlocked, generationRateLimit, async (req, res) 
     }
 });
 
-app.get('/api/qrcode', blockIfIpBlocked, generationRateLimit, async (req, res) => {
+app.get('/api/qrcode', blockIfIpBlocked, identifyAnonymousUser, generationRateLimit, async (req, res) => {
     const text = getText(req, res);
     if (text === null) return;
 
@@ -315,11 +407,11 @@ app.get('/api/admin/me', (req, res, next) => {
     res.json({ username: req.session.user.username });
 });
 
-app.get('/api/geography', blockIfIpBlocked, (req, res) => {
+app.get('/api/geography', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
     res.json(readGeography());
 });
 
-app.get('/api/form-fields', blockIfIpBlocked, (req, res) => {
+app.get('/api/form-fields', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
     res.json(readFormFields());
 });
 
@@ -487,9 +579,10 @@ app.get('/api/admin/history', requireAdmin, (req, res) => {
 
     if (search) {
         where = `WHERE h.ip LIKE ? OR c.label LIKE ? OR h.barcode LIKE ?
-            OR h.district LIKE ? OR h.commune LIKE ? OR h.village LIKE ? OR h.legacy_username LIKE ?`;
+            OR h.district LIKE ? OR h.commune LIKE ? OR h.village LIKE ?
+            OR h.legacy_username LIKE ? OR h.anonymous_user_id LIKE ?`;
         const query = `%${search}%`;
-        values.push(query, query, query, query, query, query, query);
+        values.push(query, query, query, query, query, query, query, query);
     }
 
     const total = database.prepare(`
@@ -497,7 +590,7 @@ app.get('/api/admin/history', requireAdmin, (req, res) => {
         LEFT JOIN ip_controls c ON c.ip = h.ip ${where}
     `).get(...values).count;
     const rows = database.prepare(`
-        SELECT h.id, h.ip, COALESCE(c.label, '') AS ip_label,
+        SELECT h.id, h.ip, h.anonymous_user_id, COALESCE(c.label, '') AS ip_label,
             h.legacy_username, h.barcode, h.district, h.commune, h.village,
             h.field_values, h.created_at
         FROM history h
@@ -527,13 +620,83 @@ app.get('/api/admin/kiemke-history', requireAdmin, (req, res) => {
     const total = database.prepare(`SELECT COUNT(*) AS count FROM inventory_history ${where}`)
         .get(...values).count;
     const rows = database.prepare(`
-        SELECT id, ip, waybill, created_at
+        SELECT id, ip, waybill, created_at, anonymous_user_id
         FROM inventory_history ${where}
         ORDER BY id DESC
         LIMIT ? OFFSET ?
     `).all(...values, limit, (page - 1) * limit);
 
     res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
+});
+
+app.get('/api/admin/anonymous-users', requireAdmin, (req, res) => {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = 50;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+    const values = [];
+    let where = '';
+
+    if (search) {
+        where = `WHERE u.id LIKE ? OR EXISTS (
+            SELECT 1 FROM anonymous_user_ips ui
+            WHERE ui.anonymous_user_id = u.id AND ui.ip LIKE ?
+        )`;
+        const query = `%${search}%`;
+        values.push(query, query);
+    }
+
+    const total = database.prepare(`SELECT COUNT(*) AS count FROM anonymous_users u ${where}`)
+        .get(...values).count;
+    const rows = database.prepare(`
+        SELECT u.id, u.first_seen_at, u.last_seen_at,
+            (SELECT COUNT(*) FROM anonymous_sessions s WHERE s.anonymous_user_id = u.id) AS session_count,
+            (SELECT COUNT(*) FROM anonymous_user_ips ui WHERE ui.anonymous_user_id = u.id) AS ip_count,
+            (SELECT COUNT(*) FROM history h WHERE h.anonymous_user_id = u.id) AS history_count,
+            (SELECT COUNT(*) FROM inventory_history ih WHERE ih.anonymous_user_id = u.id) AS inventory_count
+        FROM anonymous_users u ${where}
+        ORDER BY u.last_seen_at DESC
+        LIMIT ? OFFSET ?
+    `).all(...values, limit, (page - 1) * limit)
+        .map(row => ({ ...row, generated_code_count: row.history_count + row.inventory_count }));
+
+    res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
+});
+
+app.get('/api/admin/anonymous-users/:id', requireAdmin, (req, res) => {
+    if (!isValidAnonymousToken(req.params.id, 'u')) {
+        return res.status(400).json({ error: 'Anonymous user ID không hợp lệ.' });
+    }
+
+    const user = database.prepare(`
+        SELECT id, first_seen_at, last_seen_at FROM anonymous_users WHERE id = ?
+    `).get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Không tìm thấy anonymous user.' });
+
+    const ips = database.prepare(`
+        SELECT ip, first_seen_at, last_seen_at, request_count
+        FROM anonymous_user_ips
+        WHERE anonymous_user_id = ?
+        ORDER BY last_seen_at DESC
+    `).all(user.id);
+    const sessions = database.prepare(`
+        SELECT first_seen_at, last_seen_at
+        FROM anonymous_sessions
+        WHERE anonymous_user_id = ?
+        ORDER BY last_seen_at DESC
+    `).all(user.id);
+    const historyCount = database.prepare('SELECT COUNT(*) AS count FROM history WHERE anonymous_user_id = ?')
+        .get(user.id).count;
+    const inventoryCount = database.prepare('SELECT COUNT(*) AS count FROM inventory_history WHERE anonymous_user_id = ?')
+        .get(user.id).count;
+
+    res.json({
+        ...user,
+        ips,
+        sessions,
+        history_count: historyCount,
+        inventory_count: inventoryCount,
+        generated_code_count: historyCount + inventoryCount,
+    });
 });
 
 app.get('/api/admin/ips', requireAdmin, (req, res) => {

@@ -57,6 +57,30 @@ database.exec(`
         value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS anonymous_users (
+        id TEXT PRIMARY KEY,
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS anonymous_sessions (
+        id TEXT PRIMARY KEY,
+        anonymous_user_id TEXT NOT NULL,
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        FOREIGN KEY (anonymous_user_id) REFERENCES anonymous_users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS anonymous_user_ips (
+        anonymous_user_id TEXT NOT NULL,
+        ip TEXT NOT NULL,
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        request_count INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (anonymous_user_id, ip),
+        FOREIGN KEY (anonymous_user_id) REFERENCES anonymous_users(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
         sid TEXT PRIMARY KEY,
         session TEXT NOT NULL,
@@ -68,9 +92,9 @@ database.exec(`
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip TEXT NOT NULL,
         waybill TEXT NOT NULL,
+        anonymous_user_id TEXT,
         created_at TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS inventory_history_created_at_idx ON inventory_history(created_at DESC);
 `);
 
 for (const [table, column] of [['districts', 'is_hidden'], ['communes', 'is_hidden']]) {
@@ -122,10 +146,23 @@ const currentHistoryColumns = database.pragma('table_info(history)');
 if (!currentHistoryColumns.some(column => column.name === 'field_values')) {
     database.exec("ALTER TABLE history ADD COLUMN field_values TEXT NOT NULL DEFAULT '{}'");
 }
+if (!currentHistoryColumns.some(column => column.name === 'anonymous_user_id')) {
+    database.exec('ALTER TABLE history ADD COLUMN anonymous_user_id TEXT');
+}
+
+const inventoryHistoryColumns = database.pragma('table_info(inventory_history)');
+if (!inventoryHistoryColumns.some(column => column.name === 'anonymous_user_id')) {
+    database.exec('ALTER TABLE inventory_history ADD COLUMN anonymous_user_id TEXT');
+}
 
 database.exec(`
     CREATE INDEX IF NOT EXISTS history_created_at_idx ON history(created_at DESC);
     CREATE INDEX IF NOT EXISTS history_ip_idx ON history(ip);
+    CREATE INDEX IF NOT EXISTS history_anonymous_user_idx ON history(anonymous_user_id);
+    CREATE INDEX IF NOT EXISTS inventory_history_created_at_idx ON inventory_history(created_at DESC);
+    CREATE INDEX IF NOT EXISTS inventory_history_anonymous_user_idx ON inventory_history(anonymous_user_id);
+    CREATE INDEX IF NOT EXISTS anonymous_sessions_user_idx ON anonymous_sessions(anonymous_user_id, last_seen_at DESC);
+    CREATE INDEX IF NOT EXISTS anonymous_user_ips_ip_idx ON anonymous_user_ips(ip);
 `);
 
 if (!database.prepare('SELECT 1 FROM app_settings WHERE key = ?').get('geography_seeded')) {

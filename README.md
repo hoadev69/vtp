@@ -14,6 +14,8 @@ Người dùng mở trang chủ để tạo mã không cần đăng nhập. Mở
 
 Dữ liệu nằm trong `data/history.sqlite` và được giữ qua các lần khởi động. Bản ghi lịch sử cũ được giữ lại nhưng IP hiển thị là `unknown`, vì trước đây hệ thống chưa ghi nhận địa chỉ IP.
 
+Trình duyệt được gán anonymous ID ngẫu nhiên qua cookie `vtp.uid` (HttpOnly, SameSite=Lax, Secure trong production, thời hạn một năm); cookie session trình duyệt riêng `vtp.anon.sid` không dùng để xác thực và chỉ được lưu dạng SHA-256 trong DB. Anonymous ID liên kết các session, các IP đã truy cập và các mã tạo mới; history cũ giữ nguyên với `anonymous_user_id` là `NULL`. IP vẫn được dùng làm thông tin mạng, rate limit và chặn IP, không phải định danh người dùng. Admin có thể tra danh sách qua `GET /api/admin/anonymous-users` và chi tiết một ID qua `GET /api/admin/anonymous-users/:id`.
+
 Có thể đặt `DATABASE_PATH` để dùng đường dẫn DB khác; trên nền tảng có ổ đĩa tạm thời, cần mount ổ đĩa bền vững và trỏ biến này vào đó. Sao lưu SQLite cùng các file `-wal`/`-shm` bằng công cụ SQLite phù hợp hoặc sau khi dừng ứng dụng. Phiên đăng nhập được lưu trong cùng DB và tự hết hạn sau 8 giờ. Giữ `SESSION_SECRET` ổn định giữa các lần triển khai để phiên hiện tại tiếp tục hợp lệ.
 
 `/healthz` trả HTTP 200 khi ứng dụng truy vấn được SQLite và 503 khi DB không khả dụng. Đặt endpoint này làm health check của nền tảng triển khai. Đăng nhập bị giới hạn 10 lần sai trong 15 phút; các endpoint tạo/lưu mã bị giới hạn tổng cộng 120 yêu cầu mỗi phút trên mỗi IP.
