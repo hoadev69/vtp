@@ -81,6 +81,12 @@ function getAdminUser(req) {
     return user;
 }
 
+function logSessionDebug(req, route) {
+    const hasSessionCookie = (req.headers.cookie || '').split(';')
+        .some(cookie => cookie.trim().startsWith('vtp.sid='));
+    console.log(`[SESSION DEBUG] ${route} cookie=${hasSessionCookie} secure=${req.secure} proto=${req.get('X-Forwarded-Proto') || 'none'} sessionUser=${Boolean(req.session?.user)} NODE_ENV=${process.env.NODE_ENV || 'undefined'}`);
+}
+
 function requireAdmin(req, res, next) {
     if (!getAdminUser(req)) {
         return res.status(401).json({ error: 'Vui lòng đăng nhập bằng tài khoản quản trị.' });
@@ -143,6 +149,7 @@ app.get('/ketqua.html', blockIfIpBlocked, (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
+    logSessionDebug(req, '/admin');
     const admin = getAdminUser(req);
     res.sendFile(path.join(__dirname, admin ? 'admin.html' : 'login.html'));
 });
@@ -245,7 +252,10 @@ app.get('/api/qrcode', blockIfIpBlocked, async (req, res) => {
     }
 });
 
-app.get('/api/admin/me', requireAdmin, (req, res) => {
+app.get('/api/admin/me', (req, res, next) => {
+    logSessionDebug(req, '/api/admin/me');
+    next();
+}, requireAdmin, (req, res) => {
     res.json({ username: req.session.user.username });
 });
 
