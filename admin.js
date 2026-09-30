@@ -18,7 +18,6 @@ const recreationEntries = new Map();
 async function api(url, options = {}) {
     const response = await fetch(url, options);
     if (response.status === 401) {
-        window.location.assign('/admin');
         throw new Error('Phiên quản trị đã hết hạn.');
     }
     const result = response.status === 204 ? null : await response.json();
@@ -579,8 +578,13 @@ fetch('/api/admin/me').then(async response => {
 });
 
 document.getElementById('logoutButton').addEventListener('click', async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    window.location.assign('/admin');
+    try {
+        const response = await fetch('/api/logout', { method: 'POST' });
+        if (!response.ok) throw new Error(`Đăng xuất thất bại (HTTP ${response.status}).`);
+        window.location.replace('/admin');
+    } catch (error) {
+        console.error('Không thể đăng xuất:', error);
+    }
 });
 
 ipRows.addEventListener('click', async event => {
