@@ -1,11 +1,8 @@
 :root {
-    color-scheme: light;
-    font-family: Arial, sans-serif;
-    color: #1c2a22;
-    background: #edf2ed;
+    font-family: var(--font-family-sans);
+    color: var(--color-text);
+    background: var(--color-background);
 }
-
-* { box-sizing: border-box; }
 
 body {
     min-height: 100vh;
@@ -13,21 +10,21 @@ body {
     display: grid;
     place-items: center;
     padding: 20px;
-    background: linear-gradient(135deg, #edf2ed 0%, #f8f8f2 52%, #e4eee7 100%);
+    background: var(--color-background);
 }
 
 .login-panel {
     width: min(100%, 390px);
     padding: 34px;
-    background: #fff;
-    border: 1px solid #d6e0d8;
-    border-top: 4px solid #247446;
-    box-shadow: 0 16px 42px #1c392514;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-top: 4px solid var(--color-primary);
+    box-shadow: var(--shadow-md);
 }
 
 .eyebrow {
     margin: 0 0 10px;
-    color: #247446;
+    color: var(--color-primary);
     font-size: 12px;
     font-weight: 700;
 }
@@ -40,8 +37,10 @@ input {
     width: 100%;
     min-height: 42px;
     padding: 9px 11px;
-    border: 1px solid #b9c8bd;
-    border-radius: 3px;
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    background: var(--color-surface);
     font: inherit;
 }
 
@@ -49,15 +48,15 @@ button {
     min-height: 44px;
     margin-top: 12px;
     border: 0;
-    border-radius: 3px;
-    background: #247446;
-    color: #fff;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
     font: inherit;
     font-weight: 700;
     cursor: pointer;
 }
 
-#loginError { margin: 2px 0 0; color: #a32626; font-size: 14px; }
+#loginError { margin: 2px 0 0; color: var(--color-danger); font-size: var(--font-size-body-small); }
 
 @media (max-width: 480px) {
     .login-panel { padding: 26px 22px; }

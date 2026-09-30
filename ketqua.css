@@ -48,15 +48,21 @@
     min-height: 38px;
     padding: 8px 16px;
     border: 0;
-    border-radius: 3px;
-    background: #176b50;
-    color: #fff;
-    font: 600 14px Arial, sans-serif;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font: 600 var(--font-size-button) var(--font-family-sans);
     cursor: pointer;
+    transition: background-color var(--transition-fast), outline-color var(--transition-fast);
 }
 
 #print-button:hover {
-    background: #10543e;
+    background: var(--color-primary-hover);
+}
+
+#print-button:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
 }
 
 #sst p {

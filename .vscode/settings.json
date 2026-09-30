@@ -53,6 +53,62 @@
         "/^node --check session-store\\.js$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^node -e 'const lum=h=>\\{const c=h\\.match\\(/\\[0-9a-f\\]\\{2\\}/gi\\)\\.map\\(v=>parseInt\\(v,16\\)/255\\)\\.map\\(v=>v<=\\.04045\\?v/12\\.92:\\(\\(v\\+\\.055\\)/1\\.055\\)\\*\\*2\\.4\\);return \\.2126\\*c\\[0\\]\\+\\.7152\\*c\\[1\\]\\+\\.0722\\*c\\[2\\]\\};const contrast=\\(a,b\\)=>\\{const x=lum\\(a\\),y=lum\\(b\\);return \\(Math\\.max\\(x,y\\)\\+\\.05\\)/\\(Math\\.min\\(x,y\\)\\+\\.05\\)\\};for\\(const fg of \\[\"52635c\",\"5d6e67\",\"62726b\",\"5f7069\",\"a32626\",\"a0442e\",\"215f4b\"\\]\\)console\\.log\\(`#\\$\\{fg\\} on white \\$\\{contrast\\(fg,\"ffffff\"\\)\\.toFixed\\(2\\)\\}:1; on #f4f7f5 \\$\\{contrast\\(fg,\"f4f7f5\"\\)\\.toFixed\\(2\\)\\}:1`\\);for\\(const fg of \\[\"e4ede8\",\"b7c5bd\",\"9eafa5\",\"70cb9b\",\"f2bd73\",\"ff9288\"\\]\\)console\\.log\\(`#\\$\\{fg\\} on #1d2621 \\$\\{contrast\\(fg,\"1d2621\"\\)\\.toFixed\\(2\\)\\}:1`\\)';$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const fs=require\\(\"node:fs\"\\);const files=\\[\"home\\.css\",\"login\\.css\",\"admin\\.css\",\"kiemke\\.css\",\"ketqua\\.css\"\\];const css=files\\.map\\(file=>fs\\.readFileSync\\(file,\"utf8\"\\)\\)\\.join\\(\"\\\\n\"\\);const defs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/\\(--\\[\\\\w-\\]\\+\\)\\\\s\\*:/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);const refs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/var\\\\\\(\\\\s\\*\\(--\\[\\\\w-\\]\\+\\)/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);const missing=\\[\\.\\.\\.refs\\]\\.filter\\(name=>!defs\\.has\\(name\\)\\);console\\.log\\(`Declared tokens: \\$\\{defs\\.size\\}`\\);console\\.log\\(`Referenced tokens: \\$\\{refs\\.size\\}`\\);console\\.log\\(`Undefined references: \\$\\{missing\\.join\\(\", \"\\) \\|\\| \"none\"\\}`\\);'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const lum=h=>\\{const c=h\\.match\\(/\\[0-9a-f\\]\\{2\\}/gi\\)\\.map\\(v=>parseInt\\(v,16\\)/255\\)\\.map\\(v=>v<=\\.04045\\?v/12\\.92:\\(\\(v\\+\\.055\\)/1\\.055\\)\\*\\*2\\.4\\);return \\.2126\\*c\\[0\\]\\+\\.7152\\*c\\[1\\]\\+\\.0722\\*c\\[2\\]\\};const ratio=\\(a,b\\)=>\\{const x=lum\\(a\\),y=lum\\(b\\);return \\(Math\\.max\\(x,y\\)\\+\\.05\\)/\\(Math\\.min\\(x,y\\)\\+\\.05\\)\\};const pairs=\\[\\[\"#14745b\",\"#ffffff\",\"primary/button light\"\\],\\[\"#215f4b\",\"#ffffff\",\"primary text light\"\\],\\[\"#5d6e67\",\"#f4f7f5\",\"muted light\"\\],\\[\"#a32626\",\"#ffffff\",\"danger light\"\\],\\[\"#a0442e\",\"#ffffff\",\"warning light\"\\],\\[\"#092d21\",\"#68c6a2\",\"primary/button dark\"\\],\\[\"#a0d7bf\",\"#1d2621\",\"primary text dark\"\\],\\[\"#9eafa5\",\"#1d2621\",\"muted dark\"\\],\\[\"#ff9288\",\"#1d2621\",\"danger dark\"\\],\\[\"#f2bd73\",\"#1d2621\",\"warning dark\"\\]\\];for\\(const \\[fg,bg,name\\] of pairs\\)console\\.log\\(`\\$\\{name\\}: \\$\\{ratio\\(fg\\.slice\\(1\\),bg\\.slice\\(1\\)\\)\\.toFixed\\(2\\)\\}:1`\\)'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const fs=require\\(\"node:fs\"\\);const files=\\[\"home\\.css\",\"login\\.css\",\"admin\\.css\",\"kiemke\\.css\",\"ketqua\\.css\"\\];const css=files\\.map\\(file=>fs\\.readFileSync\\(file,\"utf8\"\\)\\)\\.join\\(\"\\\\n\"\\);const defs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/\\(--\\[\\\\w-\\]\\+\\)\\\\s\\*:/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);const refs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/var\\\\\\(\\\\s\\*\\(--\\[\\\\w-\\]\\+\\)/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);const missing=\\[\\.\\.\\.refs\\]\\.filter\\(name=>!defs\\.has\\(name\\)\\);console\\.log\\(`Token refs=\\$\\{refs\\.size\\}; undefined=\\$\\{missing\\.length \\? missing\\.join\\(\", \"\\) : \"none\"\\}`\\)' && git diff --unified=0 -- ketqua\\.css$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^for browser in chromium chromium-browser google-chrome google-chrome-stable firefox; do command -v \"\\$browser\" \\|\\| true; done; node -e 'for \\(const name of \\[\"playwright\", \"@playwright/test\", \"puppeteer\"\\]\\) \\{ try \\{ console\\.log\\(`\\$\\{name\\}: \\$\\{require\\.resolve\\(name\\)\\}`\\); \\} catch \\{ console\\.log\\(`\\$\\{name\\}: unavailable`\\); \\} \\}'; printf 'BROWSER=%s\\\\n' \"\\$\\{BROWSER:-\\}\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\"\\$BROWSER\" --help$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^printf '%s\\\\n' 'CURRENT print rules:'; grep -nE '@page\\|size:\\|width: 105mm\\|height: 74mm\\|#barcode > img\\|#qrcode > img\\|font-family: \"Times New Roman\"' ketqua\\.css; printf '%s\\\\n' 'BASE print rules:'; git show HEAD:ketqua\\.css \\| grep -nE '@page\\|size:\\|width: 105mm\\|height: 74mm\\|#barcode > img\\|#qrcode > img\\|font-family: \"Times New Roman\"'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const lum=h=>\\{const c=h\\.match\\(/\\[0-9a-f\\]\\{2\\}/gi\\)\\.map\\(v=>parseInt\\(v,16\\)/255\\)\\.map\\(v=>v<=\\.04045\\?v/12\\.92:\\(\\(v\\+\\.055\\)/1\\.055\\)\\*\\*2\\.4\\);return \\.2126\\*c\\[0\\]\\+\\.7152\\*c\\[1\\]\\+\\.0722\\*c\\[2\\]\\};const cr=\\(a,b\\)=>\\{const x=lum\\(a\\),y=lum\\(b\\);return \\(Math\\.max\\(x,y\\)\\+\\.05\\)/\\(Math\\.min\\(x,y\\)\\+\\.05\\)\\};for\\(const \\[name,fg,bg\\] of \\[\\[\"placeholder light\",\"87948e\",\"ffffff\"\\],\\[\"disabled light\",\"87948e\",\"edf2ee\"\\],\\[\"placeholder dark\",\"718178\",\"1d2621\"\\],\\[\"disabled dark\",\"718178\",\"202a25\"\\],\\[\"focus light\",\"14745b\",\"ffffff\"\\],\\[\"focus dark\",\"79d5b0\",\"1d2621\"\\]\\]\\)console\\.log\\(`\\$\\{name\\}: \\$\\{cr\\(fg,bg\\)\\.toFixed\\(2\\)\\}:1`\\)'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^printf '%s\\\\n' 'Legacy home selectors:'; git show HEAD:home\\.css \\| grep -nE '\\(\\^\\|\\[\\[:space:\\],\\]\\)\\(body\\|button\\|input\\|select\\|textarea\\|table\\|h1\\|h2\\|h3\\|p\\|a\\|form\\)\\(\\[\\[:space:\\]\\.:#>\\\\\\[\\]\\|\\$\\)' \\|\\| true; printf '%s\\\\n' 'Current Home selectors:'; grep -nE '\\^\\(\\[\\[:alpha:\\]#\\.\\]\\|@media\\)\\|body\\|button\\|input\\|select\\|textarea\\|table\\|h1\\|h2\\|h3\\|p\\|a\\|form' home\\.css$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const lum=h=>\\{const c=h\\.match\\(/\\[0-9a-f\\]\\{2\\}/gi\\)\\.map\\(v=>parseInt\\(v,16\\)/255\\)\\.map\\(v=>v<=\\.04045\\?v/12\\.92:\\(\\(v\\+\\.055\\)/1\\.055\\)\\*\\*2\\.4\\);return \\.2126\\*c\\[0\\]\\+\\.7152\\*c\\[1\\]\\+\\.0722\\*c\\[2\\]\\};const cr=\\(a,b\\)=>\\{const x=lum\\(a\\),y=lum\\(b\\);return \\(Math\\.max\\(x,y\\)\\+\\.05\\)/\\(Math\\.min\\(x,y\\)\\+\\.05\\)\\};for\\(const \\[fg,bg,label\\] of \\[\\[\"52635c\",\"ffffff\",\"light placeholder on surface\"\\],\\[\"b7c5bd\",\"1d2621\",\"dark placeholder on surface\"\\]\\]\\)console\\.log\\(`\\$\\{label\\}: \\$\\{cr\\(fg,bg\\)\\.toFixed\\(2\\)\\}:1`\\)'; grep -n '/home\\.css' server\\.js; grep -RniE '\\\\bui-\\(button\\|input\\|select\\|textarea\\|surface\\|badge\\|alert\\|dialog\\|tabs\\|table\\|empty\\|loading\\|error\\|page-header\\|section-header\\|action-group\\)\\\\b' --include='\\*\\.css' --include='\\*\\.html' \\. --exclude-dir=node_modules \\|\\| true$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const lum=h=>\\{const c=h\\.match\\(/\\[0-9a-f\\]\\{2\\}/gi\\)\\.map\\(v=>parseInt\\(v,16\\)/255\\)\\.map\\(v=>v<=\\.04045\\?v/12\\.92:\\(\\(v\\+\\.055\\)/1\\.055\\)\\*\\*2\\.4\\);return \\.2126\\*c\\[0\\]\\+\\.7152\\*c\\[1\\]\\+\\.0722\\*c\\[2\\]\\};const cr=\\(a,b\\)=>\\{const x=lum\\(a\\),y=lum\\(b\\);return \\(Math\\.max\\(x,y\\)\\+\\.05\\)/\\(Math\\.min\\(x,y\\)\\+\\.05\\)\\};for\\(const \\[name,fg,bg\\] of \\[\\[\"placeholder light\",\"52635c\",\"ffffff\"\\],\\[\"placeholder dark\",\"b7c5bd\",\"1d2621\"\\],\\[\"success light\",\"176b50\",\"d9eee1\"\\],\\[\"warning light\",\"a0442e\",\"fbf0e6\"\\],\\[\"danger light\",\"a32626\",\"faeceb\"\\],\\[\"info light\",\"28617a\",\"eaf2f6\"\\],\\[\"success dark\",\"70cb9b\",\"234232\"\\],\\[\"warning dark\",\"f2bd73\",\"3d3022\"\\],\\[\"danger dark\",\"ff9288\",\"432a29\"\\],\\[\"info dark\",\"8dc4dd\",\"22353d\"\\],\\[\"danger button dark\",\"092d21\",\"ff9288\"\\]\\]\\)console\\.log\\(`\\$\\{name\\}: \\$\\{cr\\(fg,bg\\)\\.toFixed\\(2\\)\\}:1`\\)';$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const fs=require\\(\"node:fs\"\\);const files=\\[\"home\\.css\",\"login\\.css\",\"admin\\.css\",\"kiemke\\.css\",\"ketqua\\.css\"\\];const css=files\\.map\\(file=>fs\\.readFileSync\\(file,\"utf8\"\\)\\)\\.join\\(\"\\\\n\"\\);const defs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/\\(--\\[\\\\w-\\]\\+\\)\\\\s\\*:/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);const refs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/var\\\\\\(\\\\s\\*\\(--\\[\\\\w-\\]\\+\\)/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);console\\.log\\(`Undefined CSS variables: \\$\\{\\[\\.\\.\\.refs\\]\\.filter\\(name=>!defs\\.has\\(name\\)\\)\\.join\\(\", \"\\) \\|\\| \"none\"\\}`\\);const names=\\[\\.\\.\\.fs\\.readFileSync\\(\"home\\.css\",\"utf8\"\\)\\.matchAll\\(/\\\\\\.ui-\\[\\\\w-\\]\\+/g\\)\\]\\.map\\(match=>match\\[0\\]\\);console\\.log\\(`Unique component selector tokens: \\$\\{new Set\\(names\\)\\.size\\}`\\);console\\.log\\(`Component selectors repeated in markup: \\$\\{files\\.some\\(file=>false\\) \\? \"check\" : \"foundation not attached in HTML\"\\}`\\);' && grep -n '!important' home\\.css && git diff --check && git diff --stat$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^git diff --name-only -- server\\.js database\\.js session-store\\.js admin\\.js login\\.js kiemke\\.js; grep -n 'min-width: 850px' admin\\.css; grep -nE 'ui-\\(button\\|input\\|select\\|textarea\\|surface\\|badge\\|alert\\|divider\\|page-header\\|section-header\\|action-group\\|table\\|dialog\\|tabs\\|empty-state\\|loading-state\\|error-state\\)' --include='\\*\\.html' \\. --exclude-dir=node_modules \\|\\| true$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const fs=require\\(\"node:fs\"\\);const files=\\[\"home\\.css\",\"login\\.css\",\"admin\\.css\",\"kiemke\\.css\",\"ketqua\\.css\"\\];const css=files\\.map\\(file=>fs\\.readFileSync\\(file,\"utf8\"\\)\\)\\.join\\(\"\\\\n\"\\);const defs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/\\(--\\[\\\\w-\\]\\+\\)\\\\s\\*:/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);const refs=new Set\\(\\[\\.\\.\\.css\\.matchAll\\(/var\\\\\\(\\\\s\\*\\(--\\[\\\\w-\\]\\+\\)/g\\)\\]\\.map\\(match=>match\\[1\\]\\)\\);const missing=\\[\\.\\.\\.refs\\]\\.filter\\(name=>!defs\\.has\\(name\\)\\);const html=fs\\.readdirSync\\(\"\\.\"\\)\\.filter\\(file=>file\\.endsWith\\(\"\\.html\"\\)\\)\\.map\\(file=>fs\\.readFileSync\\(file,\"utf8\"\\)\\)\\.join\\(\"\\\\n\"\\);const attached=\\[\\.\\.\\.html\\.matchAll\\(/\\\\bui-\\[\\\\w-\\]\\+\\\\b/g\\)\\]\\.map\\(match=>match\\[0\\]\\);console\\.log\\(`Undefined CSS variables: \\$\\{missing\\.length \\? missing\\.join\\(\", \"\\) : \"none\"\\}`\\);console\\.log\\(`New ui-\\* classes in HTML: \\$\\{new Set\\(attached\\)\\.size \\? \\[\\.\\.\\.new Set\\(attached\\)\\]\\.join\\(\", \"\\) : \"none\"\\}`\\);' && git diff --check$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

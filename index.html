@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="./home.css">
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: var(--font-family-sans);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -20,35 +20,35 @@
         }
     </style>
 </head>
-<body>
+<body class="vtp-ui home-page">
     <div class="container">
         <h2>Nhập Dữ Liệu</h2>
         <form id="formSelect" action="ketqua.html" method="GET">
             <div class="form-group">
-                <label for="huyen0">Thành phố/Huyện:</label>
-                <select id="huyen0" name="chonHuyen" onchange="updateSecondSelect()" required></select>
+                <label class="ui-label" for="huyen0">Thành phố/Huyện:</label>
+                <select id="huyen0" name="chonHuyen" class="ui-select" onchange="updateSecondSelect()" required></select>
             </div>
         
             <div class="form-group">
-                <label for="xa0">Xã:</label>
-                <select id="xa0" name="chonXa" required></select>
+                <label class="ui-label" for="xa0">Xã:</label>
+                <select id="xa0" name="chonXa" class="ui-select" required></select>
             </div>
         
             <div class="form-group">
-                <label for="thon0">Thôn:</label>
-                <select id="thon0" name="chonThon" ></select>
+                <label class="ui-label" for="thon0">Thôn:</label>
+                <select id="thon0" name="chonThon" class="ui-select" ></select>
             </div>
         
             <div class="form-group">
-                <label for="barcodeInput">Nhập số mã vạch:</label>
-                <input type="text" id="barcodeInput" name="barcode" placeholder="Nhập mã vạch" required>
+                <label class="ui-label" for="barcodeInput">Nhập số mã vạch:</label>
+                <input type="text" id="barcodeInput" name="barcode" class="ui-input" placeholder="Nhập mã vạch" required>
             </div>
         
             <div id="dynamicFields"></div>
         
-            <button type="submit">Gửi</button>
+            <button type="submit" class="ui-button ui-button--primary">Gửi</button>
         </form>
-        <p id="formError" class="form-error" role="alert" hidden></p>
+        <p id="formError" class="form-error ui-alert ui-alert--danger" role="alert" hidden></p>
         
 
         <script>
