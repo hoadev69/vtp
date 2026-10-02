@@ -8,16 +8,14 @@
     <link rel="stylesheet" href="/home.css">
     <link rel="stylesheet" href="/kiemke.css">
     <script src="/kiemke.js" defer></script>
+    <script src="/navigation.js"></script>
 </head>
 <body class="vtp-ui">
-    <header class="topbar">
+    <header class="topbar" data-vtp-navigation>
         <a class="brand" href="/">VTP <span>KIỂM KÊ</span></a>
         <div class="topbar-tools">
-            <nav aria-label="Điều hướng">
-                <a href="/">Tạo tem</a>
-                <a href="/admin">Quản trị</a>
-            </nav>
-            <div id="operatorActions" class="operator-actions" hidden>
+            <nav data-vtp-nav-links aria-label="Điều hướng"></nav>
+            <div id="operatorActions" class="operator-actions" data-vtp-nav-account hidden>
                 <span id="operatorName" class="operator-name"></span>
                 <button id="operatorLogout" type="button">Đăng xuất</button>
             </div>

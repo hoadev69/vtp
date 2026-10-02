@@ -12,10 +12,15 @@ const lockInventoryAccountDialog = document.getElementById('lockInventoryAccount
 const lockInventoryAccountError = document.getElementById('lockInventoryAccountError');
 const resetInventoryPasswordDialog = document.getElementById('resetInventoryPasswordDialog');
 const resetInventoryPasswordError = document.getElementById('resetInventoryPasswordError');
+const inventoryAccountRoleDialog = document.getElementById('inventoryAccountRoleDialog');
+const inventoryAccountRoleForm = document.getElementById('inventoryAccountRoleForm');
+const inventoryAccountRoleError = document.getElementById('inventoryAccountRoleError');
 const anonymousUsersError = document.getElementById('anonymousUsersError');
 const ipError = document.getElementById('ipError');
 const searchInput = document.getElementById('searchInput');
 const inventoryAccountSearch = document.getElementById('inventoryAccountSearch');
+const inventoryAccountRoleFilter = document.getElementById('inventoryAccountRoleFilter');
+const inventoryAccountStatusFilter = document.getElementById('inventoryAccountStatusFilter');
 const anonymousUserSearch = document.getElementById('anonymousUserSearch');
 let currentPage = 1;
 let totalPages = 1;
@@ -30,6 +35,7 @@ let inventoryAccountSearchTimer;
 let activeInventoryAccountId = null;
 let activeLockInventoryAccountId = null;
 let activeResetInventoryAccountId = null;
+let activeRoleInventoryAccountId = null;
 let activeInventoryOrdersDay = 'today';
 let anonymousSearchTimer;
 let showBlockedOnly = false;
@@ -82,6 +88,13 @@ function appendCell(row, value, className = '') {
     if (className) cell.className = className;
     row.append(cell);
     return cell;
+}
+
+function creatorIdentity(entry) {
+    const creator = [entry.creator_username, entry.legacy_username]
+        .find(value => typeof value === 'string' && value.trim());
+    if (creator) return creator;
+    return entry.ip && entry.ip !== 'unknown' ? entry.ip : 'Chưa ghi nhận IP';
 }
 
 function setEditingMode(row, editing) {
@@ -459,13 +472,14 @@ async function loadIpHistory() {
         rows.replaceChildren();
 
         if (result.rows.length === 0) {
-            appendEmptyRow(rows, 'IP này chưa có mã nào.', 6);
+            appendEmptyRow(rows, 'IP này chưa có mã nào.', 7);
             return;
         }
 
         for (const entry of result.rows) {
             const row = document.createElement('tr');
             appendCell(row, formatDate(entry.created_at));
+            appendCell(row, creatorIdentity(entry), 'history-creator');
             appendCell(row, entry.barcode);
             appendCell(row, entry.district);
             appendCell(row, entry.commune);
@@ -517,7 +531,7 @@ async function loadHistory() {
         if (result.rows.length === 0) {
             const row = document.createElement('tr');
             const cell = appendCell(row, 'Chưa có lịch sử phù hợp.');
-            cell.colSpan = 8;
+            cell.colSpan = 7;
             cell.className = 'empty-row';
             historyRows.append(row);
             return;
@@ -527,24 +541,43 @@ async function loadHistory() {
             const row = document.createElement('tr');
             recreationEntries.set(String(entry.id), entry);
             appendCell(row, formatDate(entry.created_at));
-            appendCell(row, entry.ip === 'unknown' ? 'Chưa ghi nhận IP' : entry.ip);
-            const labelCell = document.createElement('td');
-            const labelText = entry.ip_label || entry.legacy_username || '—';
+            appendCell(row, entry.barcode, 'history-code');
+
+            const recipientCell = document.createElement('td');
+            recipientCell.className = 'history-recipient';
+            const recipientName = document.createElement('span');
+            recipientName.className = 'history-recipient__name';
+            recipientName.textContent = typeof entry.fields?.nhapTen === 'string' && entry.fields.nhapTen
+                ? entry.fields.nhapTen : '—';
+            const recipientPhone = document.createElement('span');
+            recipientPhone.className = 'history-recipient__phone';
+            recipientPhone.textContent = typeof entry.fields?.nhapSdt === 'string' && entry.fields.nhapSdt
+                ? entry.fields.nhapSdt : '—';
+            recipientCell.append(recipientName, recipientPhone);
+            row.append(recipientCell);
+
+            const address = [entry.district, entry.commune, entry.village]
+                .filter(value => typeof value === 'string' && value.trim())
+                .join(' · ');
+            appendCell(row, address, 'history-address');
+            appendCell(row, entry.ip === 'unknown' ? 'Chưa ghi nhận IP' : entry.ip, 'history-ip');
+            const creatorCell = document.createElement('td');
+            creatorCell.className = 'history-creator';
+            const creatorName = document.createElement('span');
+            creatorName.className = 'history-creator__name';
+            creatorName.textContent = creatorIdentity(entry);
+            creatorCell.append(creatorName);
             if (entry.ip !== 'unknown') {
                 const ipLink = document.createElement('button');
                 ipLink.type = 'button';
                 ipLink.className = 'history-ip-link';
                 ipLink.dataset.historyIp = entry.ip;
-                ipLink.textContent = labelText;
-                labelCell.append(ipLink);
-            } else {
-                labelCell.textContent = labelText;
+                ipLink.dataset.label = entry.ip_label || '';
+                ipLink.textContent = entry.ip_label || 'Xem theo IP';
+                ipLink.setAttribute('aria-label', `Xem lịch sử theo IP ${entry.ip}`);
+                creatorCell.append(ipLink);
             }
-            row.append(labelCell);
-            appendCell(row, entry.barcode);
-            appendCell(row, entry.district);
-            appendCell(row, entry.commune);
-            appendCell(row, entry.village);
+            row.append(creatorCell);
             const actionCell = document.createElement('td');
             actionCell.append(createRecreateButton(entry));
             row.append(actionCell);
@@ -563,9 +596,11 @@ async function loadInventoryAccounts() {
     const query = new URLSearchParams({
         page: String(inventoryAccountCurrentPage),
         search: inventoryAccountSearch.value.trim(),
+        role: inventoryAccountRoleFilter.value,
+        status: inventoryAccountStatusFilter.value,
     });
     try {
-        const result = await api(`/api/admin/inventory-accounts?${query}`);
+        const result = await api(`/api/admin/users?${query}`);
         assertCurrentAdminRequest(requestGeneration);
         inventoryAccountTotalPages = result.pages;
         document.getElementById('inventoryAccountPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} tài khoản`;
@@ -575,8 +610,8 @@ async function loadInventoryAccounts() {
 
         if (result.rows.length === 0) {
             const row = document.createElement('tr');
-            const cell = appendCell(row, 'Chưa có tài khoản kiểm kê phù hợp.');
-            cell.colSpan = 6;
+            const cell = appendCell(row, 'Chưa có tài khoản phù hợp.');
+            cell.colSpan = 7;
             cell.className = 'empty-row';
             inventoryAccountRows.append(row);
             return;
@@ -587,7 +622,14 @@ async function loadInventoryAccounts() {
             row.dataset.accountId = account.id;
             row.dataset.username = account.username;
             row.dataset.active = String(Boolean(account.active));
-            appendCell(row, account.username);
+            row.dataset.role = account.role;
+            appendCell(row, account.username, 'account-username');
+            const roleCell = document.createElement('td');
+            const roleBadge = document.createElement('span');
+            roleBadge.className = `account-role-badge account-role-${account.role}`;
+            roleBadge.textContent = account.role === 'admin' ? 'Admin' : 'Operator';
+            roleCell.append(roleBadge);
+            row.append(roleCell);
             const statusCell = document.createElement('td');
             const status = document.createElement('span');
             status.className = `ip-status${account.active ? '' : ' blocked'}`;
@@ -618,8 +660,15 @@ async function loadInventoryAccounts() {
             const toggleButton = document.createElement('button');
             toggleButton.type = 'button';
             toggleButton.dataset.accountAction = 'toggle';
+            toggleButton.className = account.active ? 'account-lock-button' : 'account-unlock-button';
             toggleButton.textContent = account.active ? 'Khóa' : 'Mở khóa';
             actions.append(toggleButton);
+            const roleButton = document.createElement('button');
+            roleButton.type = 'button';
+            roleButton.dataset.accountAction = 'role';
+            roleButton.className = 'account-role-button';
+            roleButton.textContent = 'Đổi quyền';
+            actions.append(roleButton);
             const passwordButton = document.createElement('button');
             passwordButton.type = 'button';
             passwordButton.dataset.accountAction = 'password';
@@ -686,7 +735,7 @@ async function loadInventoryOrders() {
         if (result.rows.length === 0) {
             const row = document.createElement('tr');
             const cell = appendCell(row, 'Không có mã nào trong khoảng ngày này.');
-            cell.colSpan = 4;
+            cell.colSpan = 5;
             cell.className = 'empty-row';
             inventoryOrdersRows.append(row);
             return;
@@ -696,6 +745,7 @@ async function loadInventoryOrders() {
             const row = document.createElement('tr');
             appendCell(row, formatDate(entry.created_at));
             appendCell(row, entry.ip === 'unknown' ? 'Chưa ghi nhận IP' : entry.ip);
+            appendCell(row, creatorIdentity(entry), 'history-creator');
             appendCell(row, entry.waybill);
             const actionCell = document.createElement('td');
             const qrButton = document.createElement('button');
@@ -850,7 +900,7 @@ const loginModalSubmit = document.getElementById('loginModalSubmit');
 const sensitiveDialogIds = [
     'inventoryAccountCreateDialog', 'lockInventoryAccountDialog', 'resetInventoryPasswordDialog',
     'inventoryOrdersDialog', 'inventoryOrderQrDialog', 'accountLockedDialog',
-    'createdCodesDialog', 'ipHistoryDialog', 'recreateCodeDialog', 'addAddressDialog',
+    'createdCodesDialog', 'ipHistoryDialog', 'recreateCodeDialog', 'addAddressDialog', 'inventoryAccountRoleDialog',
 ];
 let authState = 'checking';
 let authGeneration = 0;
@@ -887,6 +937,8 @@ function clearAdminDomData() {
     activeInventoryAccountId = null;
     activeLockInventoryAccountId = null;
     activeResetInventoryAccountId = null;
+    activeRoleInventoryAccountId = null;
+    inventoryAccountRoleForm.reset();
     activeIpHistoryIp = '';
     geographyData = [];
     showBlockedOnly = false;
@@ -920,7 +972,7 @@ function transitionToUnauthenticated(message) {
     authGeneration += 1;
     closeSensitiveDialogs();
     clearAdminDomData();
-    dashboardHeader.hidden = true;
+    dashboardHeader.hidden = false;
     dashboardMain.hidden = true;
     loginModalForm.reset();
     loginModalSubmit.disabled = false;
@@ -929,6 +981,7 @@ function transitionToUnauthenticated(message) {
     loginModalError.textContent = message || '';
     if (!loginModal.open) loginModal.showModal();
     loginModalUsername.focus();
+    window.dispatchEvent(new CustomEvent('vtp:authchange', { detail: { role: null } }));
 }
 
 function transitionToAuthenticated(username) {
@@ -940,6 +993,7 @@ function transitionToAuthenticated(username) {
     if (loginModal.open) loginModal.close();
     dashboardHeader.hidden = false;
     dashboardMain.hidden = false;
+    window.dispatchEvent(new CustomEvent('vtp:authchange', { detail: { role: 'admin', username } }));
     loadHistory();
     loadInventoryAccounts();
     loadAnonymousUsers();
@@ -1037,16 +1091,68 @@ inventoryAccountCreateDialog.addEventListener('click', event => {
     if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
+const closeInventoryAccountRoleDialog = () => inventoryAccountRoleDialog.close();
+document.getElementById('closeInventoryAccountRole').addEventListener('click', closeInventoryAccountRoleDialog);
+document.getElementById('cancelInventoryAccountRole').addEventListener('click', closeInventoryAccountRoleDialog);
+inventoryAccountRoleDialog.addEventListener('click', event => {
+    if (event.target === event.currentTarget) closeInventoryAccountRoleDialog();
+});
+
+inventoryAccountRoleForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (activeRoleInventoryAccountId === null) return;
+    inventoryAccountRoleError.hidden = true;
+    const row = inventoryAccountRows.querySelector(`tr[data-account-id="${activeRoleInventoryAccountId}"]`);
+    const nextRole = new FormData(inventoryAccountRoleForm).get('role');
+    if (!row || row.dataset.role === nextRole) {
+        closeInventoryAccountRoleDialog();
+        return;
+    }
+    const submitButton = inventoryAccountRoleForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.dataset.loading = 'true';
+    submitButton.textContent = 'Đang lưu...';
+    setSaveStatus('Đang cập nhật vai trò...', 'pending');
+
+    try {
+        await api(`/api/admin/users/${activeRoleInventoryAccountId}/role`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: nextRole }),
+        });
+        closeInventoryAccountRoleDialog();
+        setSaveStatus('Đã cập nhật vai trò');
+        await loadInventoryAccounts();
+    } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
+        setSaveStatus('Lỗi cập nhật vai trò', 'error');
+        inventoryAccountRoleError.textContent = error.message;
+        inventoryAccountRoleError.hidden = false;
+    } finally {
+        submitButton.disabled = false;
+        delete submitButton.dataset.loading;
+        submitButton.textContent = 'Xác nhận đổi vai trò';
+    }
+});
+
 document.getElementById('inventoryAccountForm').addEventListener('submit', async event => {
     event.preventDefault();
     inventoryAccountCreateError.hidden = true;
     const form = event.currentTarget;
     const values = new FormData(form);
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.dataset.loading = 'true';
+    submitButton.textContent = 'Đang tạo...';
     try {
-        const account = await api('/api/admin/inventory-accounts', {
+        const account = await api('/api/admin/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: values.get('username'), password: values.get('password') }),
+            body: JSON.stringify({
+                username: values.get('username'),
+                password: values.get('password'),
+                role: values.get('role'),
+            }),
         });
         form.reset();
         inventoryAccountCreateDialog.close();
@@ -1057,6 +1163,10 @@ document.getElementById('inventoryAccountForm').addEventListener('submit', async
         if (isAdminRequestInterruption(error)) return;
         inventoryAccountCreateError.textContent = error.message;
         inventoryAccountCreateError.hidden = false;
+    } finally {
+        submitButton.disabled = false;
+        delete submitButton.dataset.loading;
+        submitButton.textContent = 'Tạo tài khoản';
     }
 });
 
@@ -1069,9 +1179,14 @@ document.getElementById('lockInventoryAccountForm').addEventListener('submit', a
     if (activeLockInventoryAccountId === null) return;
     lockInventoryAccountError.hidden = true;
     const form = event.currentTarget;
+    const submitButton = form.querySelector('button[type="submit"]');
     const reason = new FormData(form).get('reason').trim();
+    submitButton.disabled = true;
+    submitButton.dataset.loading = 'true';
+    submitButton.textContent = 'Đang khóa...';
+    setSaveStatus('Đang khóa tài khoản...', 'pending');
     try {
-        await api(`/api/admin/inventory-accounts/${activeLockInventoryAccountId}`, {
+        await api(`/api/admin/users/${activeLockInventoryAccountId}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ active: false, reason }),
@@ -1082,8 +1197,13 @@ document.getElementById('lockInventoryAccountForm').addEventListener('submit', a
         await loadInventoryAccounts();
     } catch (error) {
         if (isAdminRequestInterruption(error)) return;
+        setSaveStatus('Lỗi khóa tài khoản', 'error');
         lockInventoryAccountError.textContent = error.message;
         lockInventoryAccountError.hidden = false;
+    } finally {
+        submitButton.disabled = false;
+        delete submitButton.dataset.loading;
+        submitButton.textContent = 'Xác nhận khóa';
     }
 });
 
@@ -1097,8 +1217,19 @@ document.getElementById('resetInventoryPasswordForm').addEventListener('submit',
     resetInventoryPasswordError.hidden = true;
     const form = event.currentTarget;
     const password = new FormData(form).get('password');
+    const submitButton = form.querySelector('button[type="submit"]');
+    const confirmed = await confirmAction({
+        title: 'Xác nhận đặt lại mật khẩu',
+        message: `Đặt mật khẩu mới cho tài khoản "${document.getElementById('resetInventoryPasswordUsername').textContent}"? Các phiên đăng nhập hiện tại sẽ bị thu hồi.`,
+        confirmLabel: 'Đặt lại mật khẩu',
+        danger: true,
+    });
+    if (!confirmed) return;
+    submitButton.disabled = true;
+    submitButton.dataset.loading = 'true';
+    submitButton.textContent = 'Đang lưu...';
     try {
-        await api(`/api/admin/inventory-accounts/${activeResetInventoryAccountId}/password`, {
+        await api(`/api/admin/users/${activeResetInventoryAccountId}/password`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password }),
@@ -1110,6 +1241,10 @@ document.getElementById('resetInventoryPasswordForm').addEventListener('submit',
         if (isAdminRequestInterruption(error)) return;
         resetInventoryPasswordError.textContent = error.message;
         resetInventoryPasswordError.hidden = false;
+    } finally {
+        submitButton.disabled = false;
+        delete submitButton.dataset.loading;
+        submitButton.textContent = 'Lưu mật khẩu';
     }
 });
 
@@ -1123,6 +1258,16 @@ inventoryAccountRows.addEventListener('click', async event => {
     if (!button) return;
     const row = button.closest('tr[data-account-id]');
     const accountId = row.dataset.accountId;
+
+    if (button.dataset.accountAction === 'role') {
+        activeRoleInventoryAccountId = accountId;
+        document.getElementById('inventoryAccountRoleUsername').textContent = row.dataset.username;
+        inventoryAccountRoleError.hidden = true;
+        inventoryAccountRoleForm.reset();
+        inventoryAccountRoleForm.elements.role.value = row.dataset.role;
+        inventoryAccountRoleDialog.showModal();
+        return;
+    }
 
     if (button.dataset.accountAction === 'toggle' && row.dataset.active === 'true') {
         activeLockInventoryAccountId = accountId;
@@ -1150,9 +1295,17 @@ inventoryAccountRows.addEventListener('click', async event => {
         if (!confirmed) return;
     }
 
+    const unlocking = button.dataset.accountAction === 'toggle';
+    if (unlocking) {
+        button.disabled = true;
+        button.dataset.loading = 'true';
+        button.textContent = 'Đang mở khóa...';
+        setSaveStatus('Đang mở khóa tài khoản...', 'pending');
+    }
+
     try {
         if (button.dataset.accountAction === 'toggle') {
-            await api(`/api/admin/inventory-accounts/${accountId}`, {
+            await api(`/api/admin/users/${accountId}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ active: true }),
@@ -1162,8 +1315,15 @@ inventoryAccountRows.addEventListener('click', async event => {
         await loadInventoryAccounts();
     } catch (error) {
         if (isAdminRequestInterruption(error)) return;
+        if (unlocking) setSaveStatus('Lỗi mở khóa tài khoản', 'error');
         inventoryAccountsError.textContent = error.message;
         inventoryAccountsError.hidden = false;
+    } finally {
+        if (unlocking) {
+            button.disabled = false;
+            delete button.dataset.loading;
+            button.textContent = 'Mở khóa';
+        }
     }
 });
 
@@ -1278,6 +1438,13 @@ inventoryAccountSearch.addEventListener('input', () => {
         loadInventoryAccounts();
     }, 250);
 });
+
+for (const filter of [inventoryAccountRoleFilter, inventoryAccountStatusFilter]) {
+    filter.addEventListener('change', () => {
+        inventoryAccountCurrentPage = 1;
+        loadInventoryAccounts();
+    });
+}
 
 anonymousUserSearch.addEventListener('input', () => {
     clearTimeout(anonymousSearchTimer);

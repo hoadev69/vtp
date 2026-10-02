@@ -15,6 +15,7 @@ function showLogin(error = '') {
     operatorActions.hidden = true;
     loginError.textContent = error;
     loginError.hidden = !error;
+    window.dispatchEvent(new Event('vtp:authchange'));
 }
 
 function showInventory(username) {
@@ -24,6 +25,7 @@ function showInventory(username) {
     document.getElementById('operatorName').textContent = username;
     loginError.hidden = true;
     formError.hidden = true;
+    window.dispatchEvent(new Event('vtp:authchange'));
 }
 
 async function checkInventorySession() {

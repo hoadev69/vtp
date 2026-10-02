@@ -111,6 +111,7 @@ database.exec(`
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip TEXT NOT NULL,
         waybill TEXT NOT NULL,
+        creator_username TEXT,
         anonymous_user_id TEXT,
         created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at TEXT NOT NULL
@@ -140,6 +141,7 @@ if (historyColumns.length === 0) {
             commune TEXT NOT NULL,
             village TEXT NOT NULL,
             legacy_username TEXT,
+            creator_username TEXT,
             created_at TEXT NOT NULL
         );
     `);
@@ -157,6 +159,7 @@ if (historyColumns.length === 0) {
             commune TEXT NOT NULL,
             village TEXT NOT NULL,
             legacy_username TEXT,
+            creator_username TEXT,
             created_at TEXT NOT NULL
         );
         INSERT INTO history (id, ip, barcode, district, commune, village, legacy_username, created_at)
@@ -174,6 +177,9 @@ if (!currentHistoryColumns.some(column => column.name === 'field_values')) {
 if (!currentHistoryColumns.some(column => column.name === 'anonymous_user_id')) {
     database.exec('ALTER TABLE history ADD COLUMN anonymous_user_id TEXT');
 }
+if (!currentHistoryColumns.some(column => column.name === 'creator_username')) {
+    database.exec('ALTER TABLE history ADD COLUMN creator_username TEXT');
+}
 
 const inventoryHistoryColumns = database.pragma('table_info(inventory_history)');
 if (!inventoryHistoryColumns.some(column => column.name === 'anonymous_user_id')) {
@@ -181,6 +187,9 @@ if (!inventoryHistoryColumns.some(column => column.name === 'anonymous_user_id')
 }
 if (!inventoryHistoryColumns.some(column => column.name === 'created_by_user_id')) {
     database.exec('ALTER TABLE inventory_history ADD COLUMN created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
+}
+if (!inventoryHistoryColumns.some(column => column.name === 'creator_username')) {
+    database.exec('ALTER TABLE inventory_history ADD COLUMN creator_username TEXT');
 }
 
 database.exec(`

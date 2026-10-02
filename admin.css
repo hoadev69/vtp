@@ -40,22 +40,56 @@ main { width: min(1380px, 92vw); margin: 0 auto; }
 .page-heading {
     display: flex;
     justify-content: space-between;
-    align-items: end;
-    gap: 24px;
-    padding: 30px 0 22px;
+    align-items: center;
+    gap: 32px;
+    padding: 34px 0 28px;
     border-bottom: 1px solid var(--line);
 }
+.page-heading > div:first-child { min-width: 220px; }
+.page-heading h1 { font-size: 28px; font-weight: 650; line-height: 1.2; }
 .eyebrow { margin: 0 0 7px; color: var(--green); font-size: 10px; font-weight: 800; }
 h1 { margin: 0; color: var(--ink); font-size: 26px; font-weight: 700; }
 h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 700; }
-.overview-metrics { display: flex; align-items: stretch; }
-.overview-metrics > div { min-width: 112px; display: grid; align-content: center; gap: 3px; padding: 1px 17px; border-left: 1px solid var(--line); }
-.overview-metrics strong { color: var(--ink); font-size: 21px; font-variant-numeric: tabular-nums; }
-.overview-metrics span { color: var(--muted); font-size: 11px; }
+.overview-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    width: min(690px, 62%);
+}
+.overview-metrics > div {
+    display: grid;
+    align-content: center;
+    min-width: 0;
+    min-height: 96px;
+    padding: 15px 17px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-elevated);
+    box-shadow: var(--shadow-sm);
+    animation: overview-card-in 240ms ease both;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.overview-metrics > div:nth-child(2) { animation-delay: 35ms; }
+.overview-metrics > div:nth-child(3) { animation-delay: 70ms; }
+@keyframes overview-card-in {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.overview-metrics strong { color: var(--ink); font-size: 25px; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.overview-metrics span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.overview-metrics > div:has(.metric-button):hover,
+.overview-metrics > div:has(.metric-button):focus-within {
+    border-color: var(--color-border-hover);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
 .metric-button {
     display: grid;
     justify-items: start;
-    gap: 3px;
+    align-content: center;
+    gap: 7px;
+    width: 100%;
+    height: 100%;
     min-height: 0 !important;
     padding: 0 !important;
     border: 0 !important;
@@ -63,8 +97,9 @@ h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 700; }
     color: inherit !important;
     text-align: left;
 }
-.metric-button strong { color: var(--color-metric-alert); }
-.metric-button:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.history-metric strong { color: var(--color-primary); }
+#blockedIpMetric strong { color: var(--color-warning); }
+.metric-button:hover strong { text-decoration: none; }
 .history-ip-link {
     min-height: 0 !important;
     padding: 0 !important;
@@ -77,6 +112,20 @@ h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 700; }
     text-underline-offset: 2px;
 }
 .history-ip-link:hover { color: var(--green) !important; }
+.history-section #historyRows td:first-child { color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
+.history-section #historyRows .history-code {
+    color: var(--color-primary);
+    font-size: 13px;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+.history-recipient { min-width: 145px; }
+.history-recipient__name { color: var(--color-text); font-weight: 650; }
+.history-recipient__phone { margin-top: 3px; color: var(--color-text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.history-address { min-width: 190px; color: var(--color-text-secondary); line-height: 1.5; }
+.history-ip { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.history-section #historyRows .recreate-entry-button { white-space: nowrap; }
 
 .view-tabs { display: flex; gap: 27px; height: 48px; overflow-x: auto; border-bottom: 1px solid var(--line); }
 .view-tab {
@@ -107,6 +156,9 @@ h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 700; }
 .edit-toolbar .group-save:hover:not(:disabled) { border-color: var(--green-dark); background: var(--green-dark); color: var(--color-on-primary); }
 .edit-toolbar .group-cancel { color: var(--muted); }
 .search-field { display: grid; gap: 5px; width: min(360px, 100%); color: var(--muted); font-size: 11px; font-weight: 700; }
+.history-section .section-heading { align-items: center; gap: 22px; }
+.history-section .search-field { width: min(390px, 46%); font-size: 12px; }
+.history-section .search-field input { min-height: 42px; }
 input, select {
     min-height: 36px;
     padding: 7px 9px;
@@ -119,6 +171,7 @@ input, select {
 input::placeholder { color: var(--color-text-disabled); }
 .table-scroll { width: 100%; overflow-x: auto; border-top: 1px solid var(--line); }
 table { width: 100%; min-width: 850px; border-collapse: collapse; text-align: left; font-size: 12px; }
+.history-section table { min-width: 1040px; }
 th, td { padding: 10px 11px; border-bottom: 1px solid var(--color-border-subtle); vertical-align: middle; }
 th { position: sticky; top: 0; color: var(--color-text-secondary); background: var(--color-surface-secondary); font-size: 10px; font-weight: 800; white-space: nowrap; }
 td { max-width: 300px; overflow-wrap: anywhere; }
@@ -156,13 +209,118 @@ button:disabled { cursor: default; opacity: .45; }
 .ip-actions, .geography-actions { display: flex; gap: 6px; white-space: nowrap; }
 .ip-actions .block-button, .geography-actions .delete-button { color: var(--warning); }
 .ip-actions .unblock-button { color: var(--green-dark); }
+#ipRows tr { transition: background-color 140ms ease; }
+#ipRows tr[data-blocked="true"] { background: var(--color-surface-danger); }
+#ipRows tr[data-blocked="true"] td:first-child { border-inline-start: 3px solid var(--color-danger); }
+#ipRows td:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 700; }
+#ipRows td:nth-child(4) { color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
+#ipRows .ip-label-text { overflow-wrap: anywhere; }
+#ipRows .ip-status { color: var(--color-success); font-size: 11px; white-space: nowrap; }
+#ipRows .ip-status::before {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-inline-end: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    content: '';
+    vertical-align: 1px;
+}
+#ipRows .ip-status.blocked { color: var(--color-danger); }
+.ip-actions button[data-ip-action="block"] {
+    border-color: var(--color-danger);
+    background: var(--color-surface-danger);
+    color: var(--color-danger);
+}
+.ip-actions button[data-ip-action="block"]:hover:not(:disabled) {
+    border-color: var(--color-danger);
+    background: var(--color-surface-danger);
+}
+.ip-actions button[data-ip-action="unblock"] {
+    border-color: var(--color-success);
+    background: var(--color-surface-success);
+    color: var(--color-success);
+}
+.ip-actions button[data-ip-action="unblock"]:hover:not(:disabled) {
+    border-color: var(--color-success);
+    background: var(--color-surface-success);
+}
+#ipsPanel .table-scroll:has(#ipRows) { border-top-color: var(--color-border); }
+#ipFilterToggle { border-color: var(--color-border-hover); color: var(--color-primary); }
+#ipError:not([hidden]) {
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-inline-start: 3px solid var(--color-danger);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-danger);
+}
+.geography-actions { flex-wrap: wrap; }
+.geography-section tbody tr { transition: background-color 160ms ease, border-color 160ms ease; }
+.geography-section td.visibility-status {
+    color: var(--color-success);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.geography-section td.visibility-status::before {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-inline-end: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    content: '';
+    vertical-align: 1px;
+}
+.geography-section td.visibility-status.hidden { color: var(--color-warning); }
+.geography-section tr.is-editing input:not([type="checkbox"]),
+.geography-section tr.is-editing select {
+    border-color: var(--color-border-control);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-elevated);
+}
+.geography-section tr.is-editing input:focus-visible,
+.geography-section tr.is-editing select:focus-visible {
+    border-color: var(--color-primary);
+}
+.geography-actions button[data-geo-action^="hide"] {
+    border-color: var(--color-warning);
+    background: var(--color-surface-secondary);
+    color: var(--color-warning);
+}
+.geography-actions button[data-geo-action^="show"] {
+    border-color: var(--color-success);
+    background: var(--color-surface-success);
+    color: var(--color-success);
+}
+.geography-actions button[data-geo-action^="delete"] {
+    border-color: var(--color-danger);
+    background: var(--color-surface-danger);
+    color: var(--color-danger);
+}
+.geography-actions button[data-geo-action^="delete"]:hover:not(:disabled) {
+    border-color: var(--color-danger);
+    background: var(--color-surface-danger);
+}
 .empty-row { padding: 28px 10px; color: var(--muted); text-align: center; }
-.commune-heading { margin-top: 30px; }
+.geography-section .commune-heading {
+    align-items: center;
+    margin: 30px 0 12px;
+    padding: 12px 0 9px;
+    border-top: 1px solid var(--line);
+}
+.geography-section .table-scroll + .commune-heading h2 { color: var(--color-text-secondary); }
 
 .ip-history-dialog {
     width: min(900px, 92vw);
     max-width: 900px;
-    max-height: 88vh;
+    height: min(760px, calc(100vh - 48px));
+    height: min(760px, calc(100dvh - 48px));
+    min-height: min(440px, calc(100dvh - 32px));
+    max-height: calc(100dvh - 24px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: 20px 22px;
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
@@ -171,15 +329,115 @@ button:disabled { cursor: default; opacity: .45; }
     box-shadow: var(--shadow-lg);
 }
 .ip-history-dialog::backdrop { background: var(--color-overlay); }
+.ip-history-dialog > .dialog-heading { flex: 0 0 auto; }
+.ip-history-dialog > .error-message { flex: 0 0 auto; }
+.ip-history-dialog > .inventory-day-filter { flex: 0 0 auto; }
 .dialog-heading { display: flex; justify-content: space-between; align-items: start; gap: 18px; margin-bottom: 14px; }
 .dialog-heading h2 { margin-bottom: 4px; }
 .dialog-subtitle { margin: 0; color: var(--muted); font-size: 12px; }
-.ip-history-dialog .table-scroll { max-height: min(58vh, 560px); overflow: auto; }
+.ip-history-dialog > .table-scroll { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; overscroll-behavior: contain; }
 .ip-history-dialog table { min-width: 680px; }
+.ip-history-dialog > .pagination { flex: 0 0 auto; }
 .inventory-day-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .inventory-day-filter button[aria-pressed="true"] { border-color: var(--green); color: var(--color-on-primary); background: var(--green); }
 .inventory-day-filter button[aria-pressed="true"]:hover { border-color: var(--green-dark); background: var(--green-dark); }
 .inventory-order-qr-image { display: block; width: min(280px, 100%); aspect-ratio: 1; height: auto; margin: 18px auto 4px; image-rendering: pixelated; }
+#inventoryPanel .section-heading { align-items: center; }
+#inventoryPanel .edit-toolbar { align-items: end; gap: 10px; }
+#inventoryPanel .search-field { width: min(320px, 42vw); font-size: 12px; }
+#inventoryPanel .search-field input { min-height: 42px; }
+#inventoryPanel .account-filter { display: grid; gap: 5px; min-width: 112px; color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
+#inventoryPanel .account-filter select { min-height: 42px; }
+#inventoryPanel .table-scroll { border-top-color: var(--color-border); }
+#inventoryPanel table { min-width: 1120px; }
+#inventoryAccountRows td:first-child { color: var(--color-text); font-size: 13px; font-weight: 700; }
+#inventoryAccountRows td:nth-child(4), #inventoryAccountRows td:nth-child(6) {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    white-space: nowrap;
+}
+#inventoryAccountRows .account-role-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 4px 9px;
+    border: 1px solid color-mix(in srgb, var(--color-info) 34%, var(--color-border));
+    border-radius: 999px;
+    background: var(--color-surface-info);
+    color: var(--color-info);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+#inventoryAccountRows .account-role-badge.account-role-admin {
+    border-color: color-mix(in srgb, var(--color-danger) 34%, var(--color-border));
+    background: var(--color-surface-danger);
+    color: var(--color-danger);
+}
+#inventoryAccountRows .ip-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    padding: 4px 9px;
+    border: 1px solid var(--color-success);
+    border-radius: 999px;
+    background: var(--color-surface-success);
+    color: var(--color-success);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+#inventoryAccountRows .ip-status::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    content: '';
+}
+#inventoryAccountRows .ip-status.blocked {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-secondary);
+    color: var(--color-text-muted);
+}
+#inventoryAccountRows .account-lock-reason { display: block; max-width: 260px; margin-top: 5px; font-size: 11px; }
+#inventoryAccountRows td:last-child { min-width: 290px; }
+#inventoryAccountRows .ip-actions { gap: 7px; flex-wrap: wrap; white-space: normal; }
+#inventoryAccountRows button[data-account-action="toggle"] {
+    border-color: var(--color-success);
+    background: var(--color-surface-success);
+    color: var(--color-success);
+}
+#inventoryAccountRows tr[data-active="true"] button[data-account-action="toggle"] {
+    border-color: var(--color-danger);
+    background: var(--color-surface-danger);
+    color: var(--color-danger);
+}
+#inventoryAccountRows button[data-account-action="password"] { color: var(--color-text-secondary); }
+#inventoryAccountRows button[data-account-action="role"] { color: var(--color-primary); }
+#inventoryAccountRows button[data-loading="true"] { cursor: progress; opacity: .8; }
+#inventoryAccountRows button[data-loading="true"]::after,
+#inventoryAccountForm button[data-loading="true"]::after,
+#lockInventoryAccountForm button[data-loading="true"]::after,
+#resetInventoryPasswordForm button[data-loading="true"]::after,
+#inventoryAccountRoleForm button[data-loading="true"]::after {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-inline-start: 7px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    content: '';
+    vertical-align: -2px;
+    animation: account-action-spin 700ms linear infinite;
+}
+#lockInventoryAccountForm button[data-loading="true"] { cursor: progress; opacity: .8; }
+#inventoryAccountForm button[data-loading="true"],
+#resetInventoryPasswordForm button[data-loading="true"],
+#inventoryAccountRoleForm button[data-loading="true"] { cursor: progress; opacity: .8; }
+@keyframes account-action-spin { to { transform: rotate(360deg); } }
 .account-dialog {
     width: min(460px, 92vw);
     max-width: 460px;
@@ -309,19 +567,354 @@ button:disabled { cursor: default; opacity: .45; }
 #loginModal { width: min(380px, 92vw); max-width: 380px; }
 #loginModal .ui-dialog__body { display: grid; gap: var(--space-3); }
 
+@media (max-width: 900px) {
+    .geography-section .table-scroll { overflow: visible; border-top: 0; }
+    .geography-section table {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .geography-section thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+    }
+    .geography-section tbody { display: grid; gap: 10px; }
+    .geography-section tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+        gap: 0 14px;
+        padding: 5px 12px 8px;
+        border: 1px solid var(--color-border);
+        border-inline-start: 3px solid var(--color-primary);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface);
+    }
+    #communeRows tr { border-inline-start-color: var(--color-border-hover); }
+    #villageRows tr { border-inline-start-color: var(--color-success); }
+    .geography-section tbody tr.is-editing { background: var(--color-surface-editing); }
+    .geography-section tbody td {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+        max-width: none;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-subtle);
+        overflow: visible;
+        font-size: 12px;
+    }
+    .geography-section tbody td::before {
+        color: var(--color-text-muted);
+        font-size: 10px;
+        font-weight: 700;
+    }
+    #districtRows td:nth-child(1), #communeRows td:nth-child(1), #villageRows td:nth-child(1) {
+        grid-column: 1 / -1;
+        font-size: 14px;
+        font-weight: 700;
+    }
+    #districtRows td:nth-child(1)::before { content: 'Huyện'; }
+    #districtRows td:nth-child(2)::before { content: 'Loại'; }
+    #districtRows td:nth-child(3)::before { content: 'Số xã'; }
+    #districtRows td:nth-child(4)::before { content: 'Hiển thị trên form'; }
+    #communeRows td:nth-child(1)::before { content: 'Xã'; }
+    #communeRows td:nth-child(2)::before { content: 'Thuộc huyện'; }
+    #communeRows td:nth-child(3)::before { content: 'Hiển thị trên form'; }
+    #villageRows td:nth-child(1)::before { content: 'Thôn'; }
+    #villageRows td:nth-child(2)::before { content: 'Thuộc xã'; }
+    #villageRows td:nth-child(3)::before { content: 'Thuộc huyện'; }
+    #villageRows td:nth-child(4)::before { content: 'Hiển thị trên form'; }
+    .geography-section tbody td.empty-row {
+        display: block;
+        grid-column: 1 / -1;
+        padding: 17px 4px;
+        border: 0;
+        font-weight: 400;
+        text-align: center;
+    }
+    .geography-section tbody td.empty-row::before { content: none; }
+    .geography-section tbody td:last-child {
+        grid-column: 1 / -1;
+        border-bottom: 0;
+    }
+    .geography-section tbody td:last-child::before { content: 'Thao tác'; }
+    .geography-section .geography-actions { gap: 7px; white-space: normal; }
+    .geography-section .geography-actions button { min-height: 36px; }
+    .geography-section tbody td input:not([type="checkbox"]),
+    .geography-section tbody td select {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+    .geography-section .commune-heading { margin-top: 26px; }
+}
+
+@media (max-width: 960px) {
+    #inventoryPanel .section-heading { gap: 14px; }
+    .topbar[data-vtp-navigation] { flex-wrap: wrap; gap: 4px 10px; padding-top: 8px; padding-bottom: 8px; }
+    .topbar[data-vtp-navigation] [data-vtp-nav-links] { order: 3; flex: 1 0 100%; justify-content: space-between; }
+    .topbar[data-vtp-navigation] [data-vtp-nav-account] { margin-left: auto; }
+    #inventoryPanel .edit-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; width: 100%; }
+    #inventoryPanel .search-field { width: 100%; min-width: 0; }
+    #inventoryPanel .table-scroll { overflow: visible; border-top: 0; }
+    #inventoryPanel table { display: block; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; }
+    #inventoryPanel thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+    }
+    #inventoryAccountRows { display: grid; gap: 10px; }
+    #inventoryAccountRows tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+        gap: 0 14px;
+        padding: 5px 12px 8px;
+        border: 1px solid var(--color-border);
+        border-inline-start: 3px solid var(--color-success);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface-elevated);
+    }
+    #inventoryAccountRows tr[data-active="false"] { border-inline-start-color: var(--color-danger); }
+    #inventoryAccountRows td {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+        max-width: none;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-subtle);
+        overflow-wrap: anywhere;
+        font-size: 12px;
+    }
+    #inventoryAccountRows td::before { color: var(--color-text-muted); font-size: 10px; font-weight: 700; }
+    #inventoryAccountRows td:nth-child(1) { grid-column: 1 / -1; font-size: 14px; }
+    #inventoryAccountRows td:nth-child(1)::before { content: 'Tên đăng nhập'; }
+    #inventoryAccountRows td:nth-child(2)::before { content: 'Vai trò'; }
+    #inventoryAccountRows td:nth-child(3)::before { content: 'Trạng thái'; }
+    #inventoryAccountRows td:nth-child(4)::before { content: 'Ngày tạo'; }
+    #inventoryAccountRows td:nth-child(5)::before { content: 'Mã trong 3 ngày'; }
+    #inventoryAccountRows td:nth-child(6)::before { content: 'Hoạt động gần nhất'; }
+    #inventoryAccountRows td:nth-child(7) { grid-column: 1 / -1; border-bottom: 0; }
+    #inventoryAccountRows td:nth-child(7)::before { content: 'Thao tác'; }
+    #inventoryAccountRows td.empty-row { display: block; grid-column: 1 / -1; padding: 17px 4px; border: 0; text-align: center; }
+    #inventoryAccountRows td.empty-row::before { content: none; }
+    #inventoryAccountRows .ip-actions { flex-wrap: wrap; gap: 8px; white-space: normal; }
+    #inventoryAccountRows .ip-actions button { min-height: 38px; }
+}
+
 @media (max-width: 760px) {
     .topbar { padding: 0 4vw; }
+    .topbar[data-vtp-navigation] { flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+    .topbar[data-vtp-navigation] [data-vtp-nav-links] { order: 3; flex: 1 0 100%; justify-content: space-between; }
+    .topbar[data-vtp-navigation] [data-vtp-nav-account] { margin-left: auto; }
     main { width: 92vw; }
     .vtp-ui .page-heading { align-items: start; flex-direction: column; gap: 17px; padding-top: 24px; }
-    h1 { font-size: 23px; }
-    .overview-metrics { width: 100%; }
-    .overview-metrics > div { flex: 1; min-width: 0; padding: 1px 11px; }
-    .overview-metrics > div:first-child { padding-left: 0; border-left: 0; }
-    .overview-metrics strong { font-size: 19px; }
+    .page-heading h1 { font-size: 24px; }
+    .overview-metrics { width: 100%; max-width: none; gap: 10px; }
+    .overview-metrics > div { min-height: 88px; padding: 13px 14px; }
+    .overview-metrics strong { font-size: 21px; }
     .view-tabs { gap: 21px; }
     .vtp-ui .section-heading { align-items: stretch; flex-direction: column; }
     .edit-toolbar { justify-content: flex-start; }
     .search-field { width: 100%; }
+    .history-section .section-heading { align-items: stretch; gap: 13px; }
+    .history-section .search-field { width: 100%; }
+    .history-section .table-scroll { overflow: visible; border-top: 0; }
+    .history-section table { display: block; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; }
+    .history-section thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+    }
+    .history-section #historyRows { display: grid; gap: 10px; }
+    .history-section #historyRows tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+        gap: 0 14px;
+        padding: 6px 12px 9px;
+        border: 1px solid var(--color-border);
+        border-inline-start: 3px solid var(--color-primary);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface-elevated);
+    }
+    .history-section #historyRows td {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+        max-width: none;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-subtle);
+        overflow-wrap: anywhere;
+    }
+    .history-section #historyRows td::before {
+        color: var(--color-text-muted);
+        font-size: 10px;
+        font-weight: 700;
+    }
+    .history-section #historyRows td:nth-child(1) { order: 2; }
+    .history-section #historyRows td:nth-child(1)::before { content: 'Thời gian'; }
+    .history-section #historyRows td:nth-child(2) { order: 0; grid-column: 1 / -1; font-size: 15px; }
+    .history-section #historyRows td:nth-child(2)::before { content: 'Mã vận đơn'; }
+    .history-section #historyRows td:nth-child(3) { order: 1; grid-column: 1 / -1; }
+    .history-section #historyRows td:nth-child(3)::before { content: 'Người nhận / Số điện thoại'; }
+    .history-section #historyRows td:nth-child(4) { order: 5; grid-column: 1 / -1; }
+    .history-section #historyRows td:nth-child(4)::before { content: 'Địa chỉ'; }
+    .history-section #historyRows td:nth-child(5) { order: 3; }
+    .history-section #historyRows td:nth-child(5)::before { content: 'IP'; }
+    .history-section #historyRows td:nth-child(6) { order: 4; }
+    .history-section #historyRows td:nth-child(6)::before { content: 'Tên gợi nhớ'; }
+    .history-section #historyRows td:nth-child(7) { order: 6; grid-column: 1 / -1; border-bottom: 0; }
+    .history-section #historyRows td:nth-child(7)::before { content: 'Thao tác'; }
+    .history-section #historyRows td.empty-row { display: block; grid-column: 1 / -1; padding: 17px 4px; border: 0; text-align: center; }
+    .history-section #historyRows td.empty-row::before { content: none; }
+    .history-section #historyRows .history-recipient { min-width: 0; }
+    .history-section #historyRows .history-recipient__phone { margin-top: 0; }
+    .history-section #historyRows .history-address { min-width: 0; }
+    .history-section #historyRows .history-ip-link { overflow-wrap: anywhere; }
+    .history-section .pagination { justify-content: space-between; gap: 8px; }
+    .history-section .pagination button { min-height: 40px; }
+    .ips-section .table-scroll:has(#anonymousUserRows) { overflow: visible; border-top: 0; }
+    .ips-section table:has(#anonymousUserRows) { display: block; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; }
+    .ips-section table:has(#anonymousUserRows) thead,
+    #ipHistoryDialog thead, #inventoryOrdersDialog thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+    }
+    #anonymousUserRows { display: grid; gap: 10px; }
+    #anonymousUserRows tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 14px;
+        padding: 5px 12px 8px;
+        border: 1px solid var(--color-border);
+        border-inline-start: 3px solid var(--color-info);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface-elevated);
+    }
+    #anonymousUserRows td { display: grid; gap: 3px; min-width: 0; max-width: none; padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle); overflow-wrap: anywhere; }
+    #anonymousUserRows td::before { color: var(--color-text-muted); font-size: 10px; font-weight: 700; }
+    #anonymousUserRows td:nth-child(1) { grid-column: 1 / -1; font-weight: 700; }
+    #anonymousUserRows td:nth-child(1)::before { content: 'Anonymous UID'; }
+    #anonymousUserRows td:nth-child(2) { grid-column: 1 / -1; }
+    #anonymousUserRows td:nth-child(2)::before { content: 'IP đã sử dụng'; }
+    #anonymousUserRows td:nth-child(3)::before { content: 'Sessions'; }
+    #anonymousUserRows td:nth-child(4)::before { content: 'Mã đã tạo'; }
+    #anonymousUserRows td:nth-child(5)::before { content: 'Lần đầu'; }
+    #anonymousUserRows td:nth-child(6)::before { content: 'Hoạt động gần nhất'; }
+    #anonymousUserRows td.empty-row { display: block; grid-column: 1 / -1; padding: 17px 4px; border: 0; text-align: center; }
+    #anonymousUserRows td.empty-row::before { content: none; }
+    .ip-history-dialog {
+        width: calc(100vw - 20px);
+        max-width: calc(100vw - 20px);
+        height: calc(100vh - 20px);
+        height: calc(100dvh - 20px);
+        min-height: 0;
+        max-height: calc(100dvh - 20px);
+        padding: 12px;
+    }
+    .ip-history-dialog > .dialog-heading { margin-bottom: 10px; }
+    .ip-history-dialog > .table-scroll { flex: 1 1 0; min-height: 0; max-height: none; overflow: auto; overscroll-behavior: contain; }
+    .ip-history-dialog > .pagination { padding-top: 10px; }
+    #ipHistoryDialog table, #inventoryOrdersDialog table { display: block; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; }
+    #ipHistoryRows, #inventoryOrdersRows { display: grid; gap: 8px; }
+    #ipHistoryRows tr, #inventoryOrdersRows tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 12px;
+        padding: 4px 10px 7px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface-elevated);
+    }
+    #ipHistoryRows td, #inventoryOrdersRows td { display: grid; gap: 3px; min-width: 0; max-width: none; padding: 7px 0; border-bottom: 1px solid var(--color-border-subtle); overflow-wrap: anywhere; }
+    #ipHistoryRows td::before, #inventoryOrdersRows td::before { color: var(--color-text-muted); font-size: 10px; font-weight: 700; }
+    #ipHistoryRows td:nth-child(1)::before, #inventoryOrdersRows td:nth-child(1)::before { content: 'Thời gian'; }
+    #ipHistoryRows td:nth-child(2)::before { content: 'Người tạo'; }
+    #inventoryOrdersRows td:nth-child(2)::before { content: 'IP'; }
+    #ipHistoryRows td:nth-child(3)::before { content: 'Mã'; }
+    #ipHistoryRows td:nth-child(4)::before { content: 'Huyện'; }
+    #ipHistoryRows td:nth-child(5)::before { content: 'Xã'; }
+    #ipHistoryRows td:nth-child(6)::before { content: 'Thôn'; }
+    #inventoryOrdersRows td:nth-child(3)::before { content: 'Người tạo'; }
+    #inventoryOrdersRows td:nth-child(4)::before { content: 'Mã vận đơn'; }
+    #ipHistoryRows td:last-child, #inventoryOrdersRows td:last-child { grid-column: 1 / -1; border-bottom: 0; }
+    #ipHistoryRows td:last-child::before, #inventoryOrdersRows td:last-child::before { content: 'Thao tác'; }
+    #ipHistoryRows td.empty-row, #inventoryOrdersRows td.empty-row { display: block; grid-column: 1 / -1; padding: 16px 4px; border: 0; text-align: center; }
+    #ipHistoryRows td.empty-row::before, #inventoryOrdersRows td.empty-row::before { content: none; }
+    .ips-section .table-scroll:has(#ipRows) { overflow: visible; border-top: 0; }
+    .ips-section table:has(#ipRows) { display: block; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; }
+    .ips-section table:has(#ipRows) thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+    }
+    #ipRows { display: grid; gap: 10px; }
+    #ipRows tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+        gap: 0 14px;
+        padding: 5px 12px 8px;
+        border: 1px solid var(--color-border);
+        border-inline-start: 3px solid var(--color-success);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface-elevated);
+    }
+    #ipRows tr[data-blocked="true"] { border-color: var(--color-border); border-inline-start-color: var(--color-danger); }
+    #ipRows td {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+        max-width: none;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-subtle);
+        overflow-wrap: anywhere;
+        font-size: 12px;
+    }
+    #ipRows td::before { color: var(--color-text-muted); font-size: 10px; font-weight: 700; }
+    #ipRows td:nth-child(1) { grid-column: 1 / -1; font-size: 14px; }
+    #ipRows td:nth-child(1)::before { content: 'Địa chỉ IP'; }
+    #ipRows td:nth-child(2)::before { content: 'Tên gợi nhớ'; }
+    #ipRows td:nth-child(3)::before { content: 'Lượt tạo mã'; }
+    #ipRows td:nth-child(4)::before { content: 'Hoạt động gần nhất'; }
+    #ipRows td:nth-child(5)::before { content: 'Trạng thái'; }
+    #ipRows td:nth-child(6) { grid-column: 1 / -1; border-bottom: 0; }
+    #ipRows td:nth-child(6)::before { content: 'Thao tác'; }
+    #ipRows td.empty-row { display: block; grid-column: 1 / -1; padding: 17px 4px; border: 0; text-align: center; }
+    #ipRows td.empty-row::before { content: none; }
+    #ipRows td input { width: 100%; min-width: 0; max-width: 100%; }
+    #ipRows .ip-actions { flex-wrap: wrap; gap: 8px; white-space: normal; }
+    #ipRows .ip-actions button { min-height: 38px; }
     .ip-history-dialog { padding: 16px 12px; }
     .recreate-code-dialog { padding: 16px 12px; }
     .account-dialog { padding: 16px 12px; }
@@ -332,4 +925,15 @@ button:disabled { cursor: default; opacity: .45; }
     .brand span { margin-left: 4px; font-size: 9px; }
     .view-tabs { justify-content: space-between; gap: 8px; }
     .view-tab { font-size: 12px; }
+    #inventoryPanel .edit-toolbar { grid-template-columns: minmax(0, 1fr); }
+    #inventoryPanel #createInventoryAccountButton { width: 100%; }
+    .overview-metrics { grid-template-columns: 1fr; gap: 8px; }
+    .overview-metrics > div { display: flex; flex-direction: row; align-items: center; justify-content: space-between; min-height: 62px; padding: 11px 14px; }
+    .overview-metrics > div:nth-child(2) { gap: 12px; }
+    .metric-button { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+    .overview-metrics strong { font-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .overview-metrics > div { animation: none; transition: none; }
 }

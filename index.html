@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trang Nhập Liệu</title>
     <link rel="stylesheet" href="./home.css">
+    <script src="/navigation.js"></script>
     <style>
         body {
             font-family: var(--font-family-sans);
@@ -21,6 +22,11 @@
     </style>
 </head>
 <body class="vtp-ui home-page">
+    <header class="vtp-global-nav" data-vtp-navigation>
+        <a class="vtp-global-nav__brand" href="/">VTP</a>
+        <nav data-vtp-nav-links aria-label="Điều hướng"></nav>
+        <div class="vtp-global-nav__account" data-vtp-nav-account hidden></div>
+    </header>
     <div class="container">
         <h2>Nhập Dữ Liệu</h2>
         <form id="formSelect" action="ketqua.html" method="GET">

@@ -217,6 +217,42 @@
         "/^env -u NODE_OPTIONS node prepare-vtp-auth-test\\.js start$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^if lsof -iTCP:43127 -sTCP:LISTEN -t >/dev/null 2>&1; then printf 'port_43127=listening\\\\n'; else printf 'port_43127=not-listening\\\\n'; fi$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check admin\\.js && git diff --check && git diff --stat -- admin\\.html admin\\.js admin\\.css && git status --short$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check admin\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check admin\\.js && git diff --check && git diff --stat -- admin\\.js admin\\.css && git status --short$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check server\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check server\\.js && node --check session-store\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check server\\.js && node --check session-store\\.js && git diff --check$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check server\\.js && node --check admin\\.js && git diff --check$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^find /tmp -maxdepth 1 -type d -name 'vtp-phase3-users-\\*' -print; if pgrep -af 'node server\\.js' \\| grep -v 'pgrep -af' >/dev/null; then printf 'server_process=present\\\\n'; else printf 'server_process=none\\\\n'; fi$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

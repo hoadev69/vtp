@@ -106,9 +106,41 @@ button:disabled { cursor: wait; opacity: .65; }
 .close-button:hover:not(:disabled) { color: var(--ink); background: var(--color-surface-secondary); }
 @media (max-width: 480px) {
     .topbar { flex-wrap: wrap; padding: 10px 5vw; }
-    .topbar-tools { width: 100%; justify-content: space-between; gap: 8px; }
-    nav { gap: 12px; }
+    .topbar-tools { width: 100%; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    nav[data-vtp-nav-links] { order: 2; flex: 1 0 100%; justify-content: space-between; gap: 4px; }
+    .topbar-tools > #operatorActions { margin-left: auto; }
+    nav[data-vtp-nav-links] .vtp-nav-link { padding-inline: 6px; font-size: 11px; }
     .operator-actions { gap: 6px; }
     .operator-name { max-width: 82px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    main { margin-top: 19vh; }
+    main { margin-top: clamp(24px, 7vh, 56px); }
+}
+@media (max-width: 760px) {
+    #inventoryCreatePanel { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+    #inventoryCreatePanel .clipboard-button {
+        position: fixed;
+        z-index: var(--z-index-overlay);
+        left: 50%;
+        bottom: calc(12px + env(safe-area-inset-bottom) + var(--vtp-keyboard-inset, 0px));
+        width: min(calc(100vw - 32px), 520px);
+        min-height: 56px;
+        margin: 0;
+        transform: translateX(-50%);
+        box-shadow: var(--shadow-md);
+    }
+    #inventoryCreatePanel .clipboard-button:hover:not(:disabled) { transform: translate(-50%, -1px); }
+}
+@media (max-width: 760px) {
+    #inventoryCreatePanel { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+    #inventoryCreatePanel .clipboard-button {
+        position: fixed;
+        z-index: var(--z-index-overlay);
+        left: 50%;
+        bottom: calc(12px + env(safe-area-inset-bottom) + var(--vtp-keyboard-inset, 0px));
+        width: min(calc(100vw - 32px), 520px);
+        min-height: 56px;
+        margin: 0;
+        transform: translateX(-50%);
+        box-shadow: var(--shadow-md);
+    }
+    #inventoryCreatePanel .clipboard-button:hover:not(:disabled) { transform: translate(-50%, -1px); }
 }

@@ -37,15 +37,15 @@ if (!/^[a-z0-9._-]{3,32}$/.test(adminUsername)
 
 const existingAdmin = database.prepare('SELECT id, role FROM users WHERE username = ?').get(adminUsername);
 if (!existingAdmin) {
-    database.prepare(`
-        INSERT INTO users (username, password_hash, role, created_at)
-        VALUES (?, ?, 'admin', ?)
-    `).run(adminUsername, bcrypt.hashSync(adminPassword, 12), new Date().toISOString());
+    const hasAdmin = database.prepare("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1").get();
+    if (!hasAdmin) {
+        database.prepare(`
+            INSERT INTO users (username, password_hash, role, created_at)
+            VALUES (?, ?, 'admin', ?)
+        `).run(adminUsername, bcrypt.hashSync(adminPassword, 12), new Date().toISOString());
+    }
 } else if (existingAdmin.role !== 'admin') {
     throw new Error('ADMIN_USERNAME đã được dùng bởi tài khoản không phải admin.');
-} else {
-    database.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
-        .run(bcrypt.hashSync(adminPassword, 12), existingAdmin.id);
 }
 
 app.set('trust proxy', trustProxyHops);
@@ -216,11 +216,30 @@ function blockIfIpBlocked(req, res, next) {
     next();
 }
 
-function getAdminUser(req) {
-    if (!req.session.user) return null;
+async function createAuthenticatedSession(req, user) {
+    await new Promise((resolve, reject) => {
+        req.session.regenerate(error => error ? reject(error) : resolve());
+    });
+    req.session.user = { id: user.id, username: user.username, role: user.role };
+    await new Promise((resolve, reject) => {
+        req.session.save(error => error ? reject(error) : resolve());
+    });
+}
+
+async function authenticateUser(username, password, role) {
+    const user = database.prepare(`
+        SELECT id, username, password_hash, role, active, disabled_reason
+        FROM users WHERE username = ? AND role = ?
+    `).get(username, role);
+    if (!user || !await bcrypt.compare(password, user.password_hash)) return null;
+    return user;
+}
+
+function getAuthenticatedUser(req) {
+    if (!req.session?.user) return null;
     const user = database.prepare('SELECT id, username, role, active FROM users WHERE id = ?')
         .get(req.session.user.id);
-    if (!user?.active || user.role !== 'admin') {
+    if (!user?.active || !['admin', 'operator'].includes(user.role)) {
         req.session.destroy(() => {});
         return null;
     }
@@ -228,12 +247,17 @@ function getAdminUser(req) {
     return user;
 }
 
-function getInventoryUser(req) {
+function getAdminUser(req) {
+    const user = getAuthenticatedUser(req);
+    return user?.role === 'admin' ? user : null;
+}
+
+function getLegacyInventoryUser(req) {
     const token = readCookie(req, 'vtp.kiemke.sid');
     if (!token) return null;
     const tokenHash = hashInventorySessionToken(token);
     const user = database.prepare(`
-        SELECT u.id, u.username
+        SELECT u.id, u.username, u.role, u.active
         FROM inventory_sessions s
         JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = ? AND s.expires_at > ?
@@ -247,28 +271,62 @@ function getInventoryUser(req) {
     return user;
 }
 
-function requireInventoryUser(req, res, next) {
+function getRequestCreatorUser(req) {
+    return getAuthenticatedUser(req) || getLegacyInventoryUser(req);
+}
+
+function getInventoryUser(req) {
+    const hasSessionIdentity = Boolean(req.session?.user);
+    const user = getAuthenticatedUser(req);
+    if (user) {
+        const legacyUser = getLegacyInventoryUser(req);
+        if (legacyUser?.id !== user.id) delete req.inventorySessionHash;
+        return user;
+    }
+    if (hasSessionIdentity) return null;
+    return getLegacyInventoryUser(req);
+}
+
+function requireAuthenticatedUser(req, res, next) {
+    const user = getAuthenticatedUser(req);
+    if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
+    req.authUser = user;
+    next();
+}
+
+function requireAdmin(req, res, next) {
+    const user = getAuthenticatedUser(req);
+    if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập bằng tài khoản quản trị.' });
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Không có quyền truy cập.' });
+    req.authUser = user;
+    next();
+}
+
+async function requireInventoryUser(req, res, next) {
+    const hasSessionIdentity = Boolean(req.session?.user);
     const user = getInventoryUser(req);
     if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập tài khoản kiểm kê.' });
     req.inventoryUser = user;
+    req.authUser = user;
+    if (!hasSessionIdentity) {
+        try {
+            await createAuthenticatedSession(req, user);
+        } catch (error) {
+            return next(error);
+        }
+    }
     next();
 }
 
 function revokeInventorySessions(userId) {
     database.prepare('DELETE FROM inventory_sessions WHERE user_id = ?').run(userId);
+    sessionStore.destroyUserSessions(userId);
 }
 
 function logSessionDebug(req, route) {
     const hasSessionCookie = (req.headers.cookie || '').split(';')
         .some(cookie => cookie.trim().startsWith('vtp.sid='));
     console.log(`[SESSION DEBUG] ${route} cookie=${hasSessionCookie} secure=${req.secure} proto=${req.get('X-Forwarded-Proto') || 'none'} sessionUser=${Boolean(req.session?.user)} NODE_ENV=${process.env.NODE_ENV || 'undefined'}`);
-}
-
-function requireAdmin(req, res, next) {
-    if (!getAdminUser(req)) {
-        return res.status(401).json({ error: 'Vui lòng đăng nhập bằng tài khoản quản trị.' });
-    }
-    next();
 }
 
 function getText(req, res) {
@@ -339,10 +397,13 @@ app.get('/ketqua.html', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
 
 app.get('/admin', (req, res) => {
     logSessionDebug(req, '/admin');
+    const user = getAuthenticatedUser(req);
+    if (!user) return res.status(401).sendFile(path.join(__dirname, 'admin.html'));
+    if (user.role !== 'admin') return res.status(403).type('text').send('Không có quyền truy cập.');
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/admin.js', '/a7.svg'], (req, res) => {
+app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/admin.js', '/navigation.js', '/a7.svg'], (req, res) => {
     res.sendFile(path.join(__dirname, req.path.slice(1)));
 });
 
@@ -358,28 +419,32 @@ app.post('/api/login', loginRateLimit, async (req, res) => {
     const body = req.body || {};
     const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
     const password = typeof body.password === 'string' ? body.password : '';
-    const user = database.prepare(`
-        SELECT id, username, password_hash, role, active FROM users WHERE username = ?
-    `).get(username);
+    const user = await authenticateUser(username, password, 'admin');
 
-    if (!user || user.role !== 'admin' || !user.active || !await bcrypt.compare(password, user.password_hash)) {
+    if (!user || !user.active) {
         return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
     }
 
-    await new Promise((resolve, reject) => {
-        req.session.regenerate(error => error ? reject(error) : resolve());
-    });
-    req.session.user = { id: user.id, username: user.username, role: user.role };
-    await new Promise((resolve, reject) => {
-        req.session.save(error => error ? reject(error) : resolve());
-    });
+    await createAuthenticatedSession(req, user);
     res.json({ username: user.username });
 });
 
-app.post('/api/logout', requireAdmin, (req, res, next) => {
+app.post('/api/logout', requireAuthenticatedUser, (req, res, next) => {
+    const legacyToken = readCookie(req, 'vtp.kiemke.sid');
+    if (legacyToken) {
+        database.prepare('DELETE FROM inventory_sessions WHERE token_hash = ? AND user_id = ?')
+            .run(hashInventorySessionToken(legacyToken), req.authUser.id);
+    }
     req.session.destroy(error => {
         if (error) return next(error);
-        res.clearCookie('vtp.sid', { httpOnly: true, sameSite: 'lax' });
+        const cookieOptions = {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            path: '/',
+        };
+        res.clearCookie('vtp.sid', cookieOptions);
+        res.clearCookie('vtp.kiemke.sid', cookieOptions);
         res.sendStatus(204);
     });
 });
@@ -391,12 +456,9 @@ app.get('/api/kiemke/me', requireInventoryUser, (req, res) => {
 app.post('/api/kiemke/login', blockIfIpBlocked, inventoryLoginRateLimit, async (req, res) => {
     const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
-    const user = database.prepare(`
-        SELECT id, username, password_hash, active, disabled_reason FROM users
-        WHERE username = ? AND role = 'operator'
-    `).get(username);
+    const user = await authenticateUser(username, password, 'operator');
 
-    if (!user || !await bcrypt.compare(password, user.password_hash)) {
+    if (!user) {
         return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
     }
     if (!user.active) {
@@ -408,11 +470,18 @@ app.post('/api/kiemke/login', blockIfIpBlocked, inventoryLoginRateLimit, async (
     }
 
     const token = randomBytes(32).toString('base64url');
+    const tokenHash = hashInventorySessionToken(token);
     const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
     database.prepare(`
         INSERT INTO inventory_sessions (token_hash, user_id, expires_at, created_at)
         VALUES (?, ?, ?, ?)
-    `).run(hashInventorySessionToken(token), user.id, expiresAt, new Date().toISOString());
+    `).run(tokenHash, user.id, expiresAt, new Date().toISOString());
+    try {
+        await createAuthenticatedSession(req, user);
+    } catch (error) {
+        database.prepare('DELETE FROM inventory_sessions WHERE token_hash = ?').run(tokenHash);
+        throw error;
+    }
     res.cookie('vtp.kiemke.sid', token, {
         httpOnly: true,
         sameSite: 'lax',
@@ -423,15 +492,22 @@ app.post('/api/kiemke/login', blockIfIpBlocked, inventoryLoginRateLimit, async (
     res.json({ id: user.id, username: user.username });
 });
 
-app.post('/api/kiemke/logout', requireInventoryUser, (req, res) => {
-    database.prepare('DELETE FROM inventory_sessions WHERE token_hash = ?').run(req.inventorySessionHash);
-    res.clearCookie('vtp.kiemke.sid', {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
+app.post('/api/kiemke/logout', requireInventoryUser, (req, res, next) => {
+    if (req.inventorySessionHash) {
+        database.prepare('DELETE FROM inventory_sessions WHERE token_hash = ?').run(req.inventorySessionHash);
+    }
+    req.session.destroy(error => {
+        if (error) return next(error);
+        const cookieOptions = {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            path: '/',
+        };
+        res.clearCookie('vtp.sid', cookieOptions);
+        res.clearCookie('vtp.kiemke.sid', cookieOptions);
+        res.sendStatus(204);
     });
-    res.sendStatus(204);
 });
 
 app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRateLimit, (req, res) => {
@@ -445,6 +521,7 @@ app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRate
     if (locationValues.some(value => typeof value !== 'string' || value.length > 120)) {
         return res.status(400).json({ error: 'Thông tin địa chỉ không hợp lệ.' });
     }
+    const creatorUsername = getRequestCreatorUser(req)?.username || null;
 
     const fields = Object.fromEntries(readFormFields().map(field => {
         const submittedValue = submittedFields && typeof submittedFields[field.key] === 'string'
@@ -454,8 +531,8 @@ app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRate
     }));
 
     const result = database.prepare(`
-        INSERT INTO history (ip, barcode, district, commune, village, field_values, created_at, anonymous_user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO history (ip, barcode, district, commune, village, field_values, created_at, anonymous_user_id, creator_username)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         req.clientIp,
         barcode.trim(),
@@ -465,6 +542,7 @@ app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRate
         JSON.stringify(fields),
         new Date().toISOString(),
         req.anonymousUserId,
+        creatorUsername,
     );
 
     res.status(201).json({ id: result.lastInsertRowid, fields });
@@ -485,9 +563,16 @@ app.post('/api/kiemke', blockIfIpBlocked, identifyAnonymousUser, requireInventor
 
     pruneGeneratedCodeHistory();
     const result = database.prepare(`
-        INSERT INTO inventory_history (ip, waybill, created_at, anonymous_user_id, created_by_user_id)
-        VALUES (?, ?, ?, ?, ?)
-    `).run(req.clientIp, waybill.trim(), new Date().toISOString(), req.anonymousUserId, req.inventoryUser.id);
+        INSERT INTO inventory_history (ip, waybill, creator_username, created_at, anonymous_user_id, created_by_user_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+        req.clientIp,
+        waybill.trim(),
+        req.inventoryUser.username,
+        new Date().toISOString(),
+        req.anonymousUserId,
+        req.inventoryUser.id,
+    );
 
     res.status(201).json({ id: result.lastInsertRowid, qrCode });
 });
@@ -771,9 +856,9 @@ app.get('/api/admin/history', requireAdmin, (req, res) => {
     if (search) {
         where = `WHERE h.ip LIKE ? OR c.label LIKE ? OR h.barcode LIKE ?
             OR h.district LIKE ? OR h.commune LIKE ? OR h.village LIKE ?
-            OR h.legacy_username LIKE ? OR h.anonymous_user_id LIKE ?`;
+            OR h.creator_username LIKE ? OR h.legacy_username LIKE ? OR h.anonymous_user_id LIKE ?`;
         const query = `%${search}%`;
-        values.push(query, query, query, query, query, query, query, query);
+        values.push(query, query, query, query, query, query, query, query, query);
     }
 
     const total = database.prepare(`
@@ -782,7 +867,7 @@ app.get('/api/admin/history', requireAdmin, (req, res) => {
     `).get(...values).count;
     const rows = database.prepare(`
         SELECT h.id, h.ip, h.anonymous_user_id, COALESCE(c.label, '') AS ip_label,
-            h.legacy_username, h.barcode, h.district, h.commune, h.village,
+            h.creator_username, h.legacy_username, h.barcode, h.district, h.commune, h.village,
             h.field_values, h.created_at
         FROM history h
         LEFT JOIN ip_controls c ON c.ip = h.ip
@@ -824,15 +909,14 @@ app.get('/api/admin/created-codes', requireAdmin, (req, res) => {
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const codes = `
         SELECT id, 'tem' AS code_type, barcode AS code, ip, anonymous_user_id,
-            COALESCE(legacy_username, '') AS creator_username,
+            COALESCE(NULLIF(creator_username, ''), NULLIF(legacy_username, ''), ip) AS creator_username,
             district, commune, village, created_at
         FROM history
         UNION ALL
         SELECT ih.id, 'kiểm kê' AS code_type, ih.waybill AS code, ih.ip, ih.anonymous_user_id,
-            COALESCE(u.username, '') AS creator_username,
+            COALESCE(NULLIF(ih.creator_username, ''), ih.ip) AS creator_username,
             '' AS district, '' AS commune, '' AS village, ih.created_at
         FROM inventory_history ih
-        LEFT JOIN users u ON u.id = ih.created_by_user_id
     `;
     const total = database.prepare(`WITH codes AS (${codes}) SELECT COUNT(*) AS count FROM codes ${where}`)
         .get(...values).count;
@@ -857,7 +941,7 @@ app.get('/api/admin/kiemke-history', requireAdmin, (req, res) => {
     let where = '';
 
     if (search) {
-        where = 'WHERE ih.waybill LIKE ? OR ih.ip LIKE ? OR u.username LIKE ?';
+        where = 'WHERE ih.waybill LIKE ? OR ih.ip LIKE ? OR ih.creator_username LIKE ?';
         const query = `%${search}%`;
         values.push(query, query, query);
     }
@@ -865,15 +949,13 @@ app.get('/api/admin/kiemke-history', requireAdmin, (req, res) => {
     const total = database.prepare(`
         SELECT COUNT(*) AS count
         FROM inventory_history ih
-        LEFT JOIN users u ON u.id = ih.created_by_user_id
         ${where}
     `)
         .get(...values).count;
     const rows = database.prepare(`
         SELECT ih.id, ih.ip, ih.waybill, ih.created_at, ih.anonymous_user_id,
-            ih.created_by_user_id, u.username AS creator_username
+            ih.created_by_user_id, COALESCE(NULLIF(ih.creator_username, ''), ih.ip) AS creator_username
         FROM inventory_history ih
-        LEFT JOIN users u ON u.id = ih.created_by_user_id
         ${where}
         ORDER BY ih.id DESC
         LIMIT ? OFFSET ?
@@ -967,6 +1049,130 @@ app.get('/api/admin/anonymous-users/:id', requireAdmin, (req, res) => {
     });
 });
 
+app.get('/api/admin/users', requireAdmin, (req, res) => {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = 50;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+    const role = typeof req.query.role === 'string' ? req.query.role : 'all';
+    const status = typeof req.query.status === 'string' ? req.query.status : 'all';
+    if (!['all', 'admin', 'operator'].includes(role)) {
+        return res.status(400).json({ error: 'Vai trò lọc không hợp lệ.' });
+    }
+    if (!['all', 'active', 'locked'].includes(status)) {
+        return res.status(400).json({ error: 'Trạng thái lọc không hợp lệ.' });
+    }
+
+    const conditions = [];
+    const values = [];
+    if (role !== 'all') { conditions.push('u.role = ?'); values.push(role); }
+    if (status !== 'all') { conditions.push('u.active = ?'); values.push(status === 'active' ? 1 : 0); }
+    if (search) { conditions.push('lower(trim(u.username)) LIKE ?'); values.push(`%${search.toLowerCase()}%`); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const total = database.prepare(`SELECT COUNT(*) AS count FROM users u ${where}`).get(...values).count;
+    const rows = database.prepare(`
+        SELECT u.id, u.username, u.role, u.active, u.disabled_reason, u.created_at,
+            COUNT(ih.id) AS order_count, MAX(ih.created_at) AS last_seen
+        FROM users u
+        LEFT JOIN inventory_history ih ON ih.created_by_user_id = u.id
+        ${where}
+        GROUP BY u.id
+        ORDER BY u.created_at DESC, u.id DESC
+        LIMIT ? OFFSET ?
+    `).all(...values, limit, (page - 1) * limit);
+
+    res.json({ rows, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
+});
+
+app.post('/api/admin/users', requireAdmin, (req, res) => {
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const role = req.body?.role;
+    if (!/^[a-z0-9._-]{3,32}$/.test(username)
+        || password.length < 6
+        || Buffer.byteLength(password, 'utf8') > 72
+        || !['admin', 'operator'].includes(role)) {
+        return res.status(400).json({ error: 'Tên đăng nhập, mật khẩu hoặc vai trò không hợp lệ.' });
+    }
+    if (database.prepare('SELECT 1 FROM users WHERE lower(trim(username)) = ?').get(username)) {
+        return res.status(409).json({ error: 'Tên đăng nhập đã tồn tại.' });
+    }
+
+    try {
+        const createdAt = new Date().toISOString();
+        const result = database.prepare(`
+            INSERT INTO users (username, password_hash, role, active, created_at)
+            VALUES (?, ?, ?, 1, ?)
+        `).run(username, bcrypt.hashSync(password, 12), role, createdAt);
+        res.status(201).json({ id: result.lastInsertRowid, username, role, active: true, created_at: createdAt });
+    } catch (error) {
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            return res.status(409).json({ error: 'Tên đăng nhập đã tồn tại.' });
+        }
+        throw error;
+    }
+});
+
+app.patch('/api/admin/users/:id/role', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const role = req.body?.role;
+    if (!Number.isInteger(id) || !['admin', 'operator'].includes(role)) {
+        return res.status(400).json({ error: 'Tài khoản hoặc vai trò không hợp lệ.' });
+    }
+    const target = database.prepare('SELECT id, role, active FROM users WHERE id = ?').get(id);
+    if (!target) return res.status(404).json({ error: 'Không tìm thấy tài khoản.' });
+    if (target.role === role) return res.sendStatus(204);
+    if (id === req.authUser.id) {
+        return res.status(409).json({ error: 'Không thể tự thay đổi vai trò tài khoản đang đăng nhập.' });
+    }
+    if (target.role === 'admin' && target.active) {
+        const activeAdmins = database.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND active = 1").get().count;
+        if (activeAdmins <= 1) return res.status(409).json({ error: 'Không thể hạ quyền Admin cuối cùng đang hoạt động.' });
+    }
+
+    database.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+    revokeInventorySessions(id);
+    res.sendStatus(204);
+});
+
+app.patch('/api/admin/users/:id/status', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const { active, reason = '' } = req.body || {};
+    if (!Number.isInteger(id) || typeof active !== 'boolean'
+        || typeof reason !== 'string' || reason.trim().length > 500
+        || (!active && !reason.trim())) {
+        return res.status(400).json({ error: 'Tài khoản hoặc trạng thái không hợp lệ.' });
+    }
+    const target = database.prepare('SELECT id, role, active FROM users WHERE id = ?').get(id);
+    if (!target) return res.status(404).json({ error: 'Không tìm thấy tài khoản.' });
+    if (!active && id === req.authUser.id) {
+        return res.status(409).json({ error: 'Không thể tự khóa tài khoản đang đăng nhập.' });
+    }
+    if (!active && target.role === 'admin' && target.active) {
+        const activeAdmins = database.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND active = 1").get().count;
+        if (activeAdmins <= 1) return res.status(409).json({ error: 'Không thể khóa Admin cuối cùng đang hoạt động.' });
+    }
+
+    database.prepare('UPDATE users SET active = ?, disabled_reason = ? WHERE id = ?')
+        .run(active ? 1 : 0, active ? '' : reason.trim(), id);
+    revokeInventorySessions(id);
+    res.sendStatus(204);
+});
+
+app.put('/api/admin/users/:id/password', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!Number.isInteger(id) || password.length < 6 || Buffer.byteLength(password, 'utf8') > 72) {
+        return res.status(400).json({ error: 'Mật khẩu phải từ 6 ký tự và tối đa 72 byte.' });
+    }
+    const target = database.prepare('SELECT id FROM users WHERE id = ?').get(id);
+    if (!target) return res.status(404).json({ error: 'Không tìm thấy tài khoản.' });
+
+    database.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+        .run(bcrypt.hashSync(password, 12), id);
+    revokeInventorySessions(id);
+    res.sendStatus(204);
+});
+
 app.get('/api/admin/inventory-accounts', requireAdmin, (req, res) => {
     pruneGeneratedCodeHistory();
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
@@ -993,8 +1199,8 @@ app.get('/api/admin/inventory-accounts/:id/orders', requireAdmin, (req, res) => 
     pruneGeneratedCodeHistory();
     const userId = Number.parseInt(req.params.id, 10);
     if (!Number.isInteger(userId)) return res.status(400).json({ error: 'Mã tài khoản không hợp lệ.' });
-    const account = database.prepare("SELECT id FROM users WHERE id = ? AND role = 'operator'").get(userId);
-    if (!account) return res.status(404).json({ error: 'Không tìm thấy tài khoản kiểm kê.' });
+    const account = database.prepare("SELECT id FROM users WHERE id = ? AND role IN ('admin', 'operator')").get(userId);
+    if (!account) return res.status(404).json({ error: 'Không tìm thấy tài khoản.' });
 
     const from = typeof req.query.from === 'string' ? req.query.from : '';
     const to = typeof req.query.to === 'string' ? req.query.to : '';
@@ -1035,7 +1241,7 @@ app.get('/api/admin/inventory-accounts/:id/orders', requireAdmin, (req, res) => 
     const total = database.prepare(`SELECT COUNT(*) AS count FROM inventory_history WHERE ${where}`)
         .get(...values).count;
     const rows = database.prepare(`
-        SELECT id, waybill, ip, created_at
+        SELECT id, waybill, ip, creator_username, created_at
         FROM inventory_history
         WHERE ${where}
         ORDER BY created_at DESC, id DESC
@@ -1130,7 +1336,7 @@ app.get('/api/admin/ips/:ip/history', requireAdmin, (req, res) => {
     const limit = 50;
     const total = database.prepare('SELECT COUNT(*) AS count FROM history WHERE ip = ?').get(ip).count;
     const rows = database.prepare(`
-        SELECT id, barcode, district, commune, village, field_values, created_at
+        SELECT id, ip, barcode, district, commune, village, creator_username, legacy_username, field_values, created_at
         FROM history
         WHERE ip = ?
         ORDER BY id DESC

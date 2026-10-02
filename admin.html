@@ -7,11 +7,13 @@
     <link rel="stylesheet" href="/home.css">
     <link rel="stylesheet" href="/admin.css?v=created-codes-20260930">
     <script src="/admin.js?v=admin-village-management-20260930" defer></script>
+    <script src="/navigation.js"></script>
 </head>
 <body class="vtp-ui">
-    <header class="topbar" hidden>
+    <header class="topbar" data-vtp-navigation hidden>
         <a href="/" class="brand">VTP <span>QUẢN TRỊ</span></a>
-        <div class="topbar-actions">
+        <nav data-vtp-nav-links aria-label="Điều hướng"></nav>
+        <div class="topbar-actions" data-vtp-nav-account>
             <span id="adminName"></span>
             <span id="saveStatus" class="save-status" role="status" aria-live="polite"></span>
             <button id="logoutButton" type="button">Đăng xuất</button>
@@ -62,12 +64,11 @@
                     <thead>
                         <tr>
                             <th>Thời gian</th>
+                            <th>Mã vận đơn</th>
+                            <th>Người nhận / SĐT</th>
+                            <th>Địa chỉ</th>
                             <th>IP</th>
-                            <th>Tên gợi nhớ</th>
-                            <th>Mã đã tạo</th>
-                            <th>Huyện</th>
-                            <th>Xã</th>
-                            <th>Thôn</th>
+                            <th>Người tạo / nhãn IP</th>
                             <th>Thao tác</th>
                         </tr>
                     </thead>
@@ -84,11 +85,27 @@
         <section id="inventoryPanel" class="tab-panel" role="tabpanel" aria-labelledby="inventoryTab" hidden>
             <div class="section-heading ui-section-header">
                 <div>
-                    <p class="eyebrow">TÀI KHOẢN NHÂN VIÊN</p>
-                    <h2>Tài khoản kiểm kê</h2>
+                    <p class="eyebrow">QUẢN LÝ QUYỀN TRUY CẬP</p>
+                    <h2>Tài khoản VTP</h2>
                 </div>
                 <div class="edit-toolbar">
-                    <button id="createInventoryAccountButton" class="primary-action" type="button">Tạo tài khoản</button>
+                    <button id="createInventoryAccountButton" class="ui-button ui-button--primary" type="button">Tạo tài khoản</button>
+                    <label class="account-filter">
+                        <span>Vai trò</span>
+                        <select id="inventoryAccountRoleFilter">
+                            <option value="all">Tất cả</option>
+                            <option value="admin">Admin</option>
+                            <option value="operator">Operator</option>
+                        </select>
+                    </label>
+                    <label class="account-filter">
+                        <span>Trạng thái</span>
+                        <select id="inventoryAccountStatusFilter">
+                            <option value="all">Tất cả</option>
+                            <option value="active">Đang hoạt động</option>
+                            <option value="locked">Đã khóa</option>
+                        </select>
+                    </label>
                     <label class="search-field">
                         <span>Tìm tên đăng nhập</span>
                         <input id="inventoryAccountSearch" type="search" placeholder="Tên đăng nhập..." autocomplete="off">
@@ -99,7 +116,7 @@
             <div class="table-scroll">
                 <table>
                     <thead>
-                        <tr><th>Tên đăng nhập</th><th>Trạng thái</th><th>Ngày tạo</th><th>Mã trong 3 ngày</th><th>Hoạt động gần nhất</th><th>Thao tác</th></tr>
+                        <tr><th>Tên đăng nhập</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th><th>Mã trong 3 ngày</th><th>Hoạt động gần nhất</th><th>Thao tác</th></tr>
                     </thead>
                     <tbody id="inventoryAccountRows"></tbody>
                 </table>
@@ -282,12 +299,18 @@
     <dialog id="inventoryAccountCreateDialog" class="account-dialog" aria-labelledby="inventoryAccountCreateTitle">
         <div class="dialog-heading">
             <div>
-                <p class="eyebrow">TÀI KHOẢN NHÂN VIÊN</p>
-                <h2 id="inventoryAccountCreateTitle">Tạo tài khoản kiểm kê</h2>
+                <p class="eyebrow">TÀI KHOẢN VTP</p>
+                <h2 id="inventoryAccountCreateTitle">Tạo tài khoản</h2>
             </div>
             <button id="closeInventoryAccountCreate" type="button" aria-label="Đóng">Đóng</button>
         </div>
         <form id="inventoryAccountForm" class="account-form">
+            <label>Vai trò
+                <select name="role" required>
+                    <option value="operator">Operator</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </label>
             <label>Tên đăng nhập
                 <input name="username" minlength="3" maxlength="32" pattern="[a-zA-Z0-9._-]{3,32}" autocomplete="off" required>
             </label>
@@ -297,6 +320,30 @@
             <p id="inventoryAccountCreateError" class="error-message" role="alert" hidden></p>
             <div class="dialog-actions">
                 <button class="primary-action" type="submit">Tạo tài khoản</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="inventoryAccountRoleDialog" class="account-dialog" aria-labelledby="inventoryAccountRoleTitle">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">PHÂN QUYỀN</p>
+                <h2 id="inventoryAccountRoleTitle">Thay đổi vai trò</h2>
+                <p id="inventoryAccountRoleUsername" class="dialog-subtitle"></p>
+            </div>
+            <button id="closeInventoryAccountRole" type="button" aria-label="Đóng">Đóng</button>
+        </div>
+        <form id="inventoryAccountRoleForm" class="account-form">
+            <label>Vai trò mới
+                <select name="role" required>
+                    <option value="admin">Admin</option>
+                    <option value="operator">Operator</option>
+                </select>
+            </label>
+            <p id="inventoryAccountRoleError" class="error-message" role="alert" hidden></p>
+            <div class="dialog-actions">
+                <button type="button" id="cancelInventoryAccountRole">Hủy</button>
+                <button class="primary-action" type="submit">Xác nhận đổi vai trò</button>
             </div>
         </form>
     </dialog>
@@ -359,7 +406,7 @@
         <div class="table-scroll">
             <table>
                 <thead>
-                    <tr><th>Thời gian</th><th>IP</th><th>Mã vận đơn</th><th></th></tr>
+                    <tr><th>Thời gian</th><th>IP</th><th>Người tạo</th><th>Mã vận đơn</th><th></th></tr>
                 </thead>
                 <tbody id="inventoryOrdersRows"></tbody>
             </table>
@@ -432,7 +479,7 @@
         <div class="table-scroll">
             <table>
                 <thead>
-                    <tr><th>Thời gian</th><th>Mã</th><th>Thành phố/Huyện</th><th>Xã</th><th>Thôn</th><th></th></tr>
+                    <tr><th>Thời gian</th><th>Người tạo</th><th>Mã</th><th>Thành phố/Huyện</th><th>Xã</th><th>Thôn</th><th></th></tr>
                 </thead>
                 <tbody id="ipHistoryRows"></tbody>
             </table>

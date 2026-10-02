@@ -62,6 +62,24 @@ class SQLiteSessionStore extends session.Store {
             callback?.(error);
         }
     }
+
+    destroyUserSessions(userId) {
+        const rows = this.database.prepare('SELECT sid, session FROM sessions').all();
+        const sessionIds = [];
+        for (const row of rows) {
+            try {
+                if (Number(JSON.parse(row.session)?.user?.id) === Number(userId)) sessionIds.push(row.sid);
+            } catch {
+                // Keep malformed rows untouched; their owner cannot be identified safely.
+            }
+        }
+
+        const destroySessions = this.database.transaction(ids => {
+            for (const sid of ids) this.deleteSession.run(sid);
+        });
+        destroySessions(sessionIds);
+        return sessionIds.length;
+    }
 }
 
 module.exports = SQLiteSessionStore;
