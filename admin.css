@@ -164,7 +164,7 @@ input, select {
     padding: 7px 9px;
     border: 1px solid var(--color-border-control);
     border-radius: var(--radius-sm);
-    background: var(--color-surface);
+    background-color: var(--color-surface);
     color: var(--ink);
     font-size: 13px;
 }
@@ -277,7 +277,7 @@ button:disabled { cursor: default; opacity: .45; }
 .geography-section tr.is-editing select {
     border-color: var(--color-border-control);
     border-radius: var(--radius-sm);
-    background: var(--color-surface-elevated);
+    background-color: var(--color-surface-elevated);
 }
 .geography-section tr.is-editing input:focus-visible,
 .geography-section tr.is-editing select:focus-visible {
@@ -713,6 +713,15 @@ button:disabled { cursor: default; opacity: .45; }
     #inventoryAccountRows td.empty-row::before { content: none; }
     #inventoryAccountRows .ip-actions { flex-wrap: wrap; gap: 8px; white-space: normal; }
     #inventoryAccountRows .ip-actions button { min-height: 38px; }
+}
+
+@media (max-width: 1024px) {
+    .account-form input:not([type="checkbox"]),
+    .account-form select,
+    .geography-section tbody td input:not([type="checkbox"]),
+    .geography-section tbody td select {
+        min-height: 44px;
+    }
 }
 
 @media (max-width: 760px) {

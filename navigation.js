@@ -9,7 +9,133 @@
     }
     root.dataset.theme = savedTheme;
 
+    const initializeInputEnhancements = () => {
+        const clearableSelector = [
+            'input:not([type])', 'input[type="text"]', 'input[type="search"]',
+            'input[type="email"]', 'input[type="tel"]', 'input[type="url"]',
+            'input[type="number"]', 'input[type="date"]', 'input[type="time"]',
+            'input[type="datetime-local"]', 'input[type="month"]', 'input[type="week"]',
+            'textarea',
+        ].join(',');
+        const clearControls = new WeakMap();
+
+        function isCredentialInput(input) {
+            const autocomplete = (input.autocomplete || '').toLowerCase().split(/\s+/u);
+            const identity = `${input.name} ${input.id}`.toLowerCase();
+            return input.dataset.vtpNoClear === 'true'
+                || autocomplete.some(value => ['username', 'email', 'current-password', 'new-password', 'one-time-code'].includes(value))
+                || identity.includes('username')
+                || identity.includes('password')
+                || identity.includes('passwd');
+        }
+
+        function makeWrapper(input, className) {
+            const wrapper = document.createElement('span');
+            wrapper.className = className;
+            input.parentNode.insertBefore(wrapper, input);
+            wrapper.append(input);
+            return wrapper;
+        }
+
+        function updateClearButton(input, button, wrapper) {
+            const hasValue = input.value.length > 0 && !input.hidden && !input.disabled;
+            button.hidden = !hasValue;
+            wrapper.classList.toggle('has-value', hasValue);
+        }
+
+        function addClearButton(input) {
+            if (input.dataset.vtpClearReady === 'true' || input.disabled || input.readOnly || isCredentialInput(input)) return;
+            input.dataset.vtpClearReady = 'true';
+            const wrapper = makeWrapper(input, 'vtp-clearable-input');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'vtp-clear-button';
+            button.setAttribute('aria-label', `Xóa ${input.labels?.[0]?.textContent?.trim() || 'nội dung'}`);
+            button.textContent = '×';
+            wrapper.append(button);
+            clearControls.set(input, { button, wrapper });
+
+            const update = () => updateClearButton(input, button, wrapper);
+            input.addEventListener('input', update);
+            input.addEventListener('change', update);
+            button.addEventListener('mousedown', event => event.preventDefault());
+            button.addEventListener('pointerdown', event => event.preventDefault());
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                if (input.disabled || input.readOnly) return;
+                input.value = '';
+                update();
+                input.focus({ preventScroll: true });
+            });
+            input.form?.addEventListener('reset', () => requestAnimationFrame(update));
+            update();
+        }
+
+        function addPasswordToggle(input) {
+            if (input.dataset.vtpPasswordReady === 'true' || input.disabled || input.readOnly) return;
+            input.dataset.vtpPasswordReady = 'true';
+            const wrapper = makeWrapper(input, 'vtp-password-field');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'vtp-password-toggle';
+            button.setAttribute('aria-label', 'Hiện mật khẩu');
+            button.setAttribute('aria-pressed', 'false');
+            button.title = 'Hiện mật khẩu';
+            button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+            wrapper.append(button);
+
+            button.addEventListener('mousedown', event => event.preventDefault());
+            button.addEventListener('pointerdown', event => event.preventDefault());
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                const visible = input.type === 'password';
+                input.type = visible ? 'text' : 'password';
+                button.setAttribute('aria-label', visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+                button.setAttribute('aria-pressed', String(visible));
+                button.title = visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu';
+                button.innerHTML = visible
+                    ? '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c5.3 0 9 4.7 10 7-.4.9-1.2 2-2.3 3M6.2 6.2C3.9 7.6 2.5 9.7 2 12c1 2.3 4.7 7 10 7 1.1 0 2.1-.2 3-.6"/></svg>'
+                    : '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+                input.focus({ preventScroll: true });
+            });
+        }
+
+        function scanInputs(scope) {
+            if (scope instanceof Element) {
+                if (scope.matches('input[type="password"]')) addPasswordToggle(scope);
+                if (scope.matches(clearableSelector)) addClearButton(scope);
+            }
+            scope.querySelectorAll?.('input[type="password"]').forEach(addPasswordToggle);
+            scope.querySelectorAll?.(clearableSelector).forEach(addClearButton);
+        }
+
+        scanInputs(document);
+        new MutationObserver(records => {
+            for (const record of records) {
+                if (record.type === 'attributes') {
+                    const clearControl = clearControls.get(record.target);
+                    if (clearControl) updateClearButton(record.target, clearControl.button, clearControl.wrapper);
+                    scanInputs(record.target);
+                    continue;
+                }
+                for (const node of record.addedNodes) {
+                    if (node instanceof Element) scanInputs(node);
+                }
+            }
+        }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'disabled'] });
+
+        const updateKeyboardInset = () => {
+            const viewport = window.visualViewport;
+            const inset = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+            document.documentElement.style.setProperty('--vtp-keyboard-inset', `${inset}px`);
+        };
+        window.visualViewport?.addEventListener('resize', updateKeyboardInset);
+        window.visualViewport?.addEventListener('scroll', updateKeyboardInset);
+        updateKeyboardInset();
+    };
+
     const initializeNavigation = () => {
+    initializeInputEnhancements();
     const navigation = document.querySelector('[data-vtp-navigation]');
     if (!navigation) return;
 
@@ -146,76 +272,6 @@
         }
     });
 
-    const clearableSelector = [
-        'input[type="text"]', 'input[type="search"]', 'input[type="email"]',
-        'input[type="tel"]', 'input[type="url"]', 'input[type="number"]', 'textarea',
-    ].join(',');
-    const clearButtons = new WeakMap();
-
-    function updateClearButton(input, button, wrapper) {
-        const hasValue = input.value.length > 0 && !input.hidden && !input.disabled;
-        button.hidden = !hasValue;
-        wrapper.classList.toggle('has-value', hasValue);
-    }
-
-    function addClearButton(input) {
-        if (input.dataset.vtpClearReady === 'true' || input.disabled || input.readOnly) return;
-        input.dataset.vtpClearReady = 'true';
-        const wrapper = document.createElement('span');
-        wrapper.className = 'vtp-clearable-input';
-        input.parentNode.insertBefore(wrapper, input);
-        wrapper.append(input);
-
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'vtp-clear-button';
-        button.setAttribute('aria-label', 'Xóa nội dung');
-        button.textContent = '×';
-        wrapper.append(button);
-        clearButtons.set(input, { button, wrapper });
-
-        const update = () => updateClearButton(input, button, wrapper);
-        input.addEventListener('input', update);
-        input.addEventListener('change', update);
-        button.addEventListener('pointerdown', event => event.preventDefault());
-        button.addEventListener('click', event => {
-            event.preventDefault();
-            if (input.disabled || input.readOnly) return;
-            input.value = '';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.focus({ preventScroll: true });
-        });
-        input.form?.addEventListener('reset', () => requestAnimationFrame(update));
-        update();
-    }
-
-    function scanClearableInputs(root) {
-        if (root instanceof Element && root.matches(clearableSelector)) addClearButton(root);
-        root.querySelectorAll?.(clearableSelector).forEach(addClearButton);
-    }
-
-    scanClearableInputs(document);
-    new MutationObserver(records => {
-        for (const record of records) {
-            if (record.type === 'attributes') {
-                const clearControl = clearButtons.get(record.target);
-                if (clearControl) updateClearButton(record.target, clearControl.button, clearControl.wrapper);
-                continue;
-            }
-            for (const node of record.addedNodes) {
-                if (node instanceof Element) scanClearableInputs(node);
-            }
-        }
-    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'disabled'] });
-
-    const updateKeyboardInset = () => {
-        const viewport = window.visualViewport;
-        const inset = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
-        document.documentElement.style.setProperty('--vtp-keyboard-inset', `${inset}px`);
-    };
-    window.visualViewport?.addEventListener('resize', updateKeyboardInset);
-    window.visualViewport?.addEventListener('scroll', updateKeyboardInset);
-    updateKeyboardInset();
     updateThemeToggle();
     refreshRole();
     };

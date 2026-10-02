@@ -171,6 +171,53 @@ body:has(dialog[open]) { overflow: hidden; }
     transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), outline-color var(--transition-fast);
 }
 
+.vtp-ui select:not([multiple]):not([size]) {
+    --select-chevron-color: var(--color-text-secondary);
+    appearance: none;
+    padding-inline-end: 40px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--select-chevron-color) 50%),
+        linear-gradient(135deg, var(--select-chevron-color) 50%, transparent 50%);
+    background-repeat: no-repeat;
+    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+    background-size: 5px 5px;
+}
+
+.vtp-ui select:not([multiple]):not([size]):hover:not(:disabled) {
+    border-color: var(--color-border-hover);
+}
+
+.vtp-ui select:not([multiple]):not([size]):disabled {
+    --select-chevron-color: var(--color-text-disabled);
+    border-color: var(--color-border);
+    background-color: var(--color-surface-disabled);
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+}
+
+.vtp-ui select:not([multiple]):not([size])[aria-invalid="true"] {
+    border-color: var(--color-danger);
+}
+
+.vtp-ui select:not([multiple]):not([size]):required:invalid {
+    color: var(--color-placeholder);
+}
+
+.vtp-ui select:not([multiple])::-ms-expand {
+    display: none;
+}
+
+@media (max-width: 1024px) {
+    .vtp-ui input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    .vtp-ui textarea,
+    .vtp-ui select {
+        font-size: 16px !important;
+    }
+    .vtp-ui select:not([multiple]):not([size]) {
+        min-height: 44px;
+    }
+}
+
 .vtp-ui :focus-visible {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
@@ -703,6 +750,29 @@ body:has(dialog[open]) { overflow: hidden; }
 .vtp-clearable-input > input,
 .vtp-clearable-input > textarea { box-sizing: border-box; width: 100%; }
 .vtp-clearable-input > input { box-sizing: border-box; width: 100%; }
+.vtp-password-field { position: relative; display: block; width: 100%; min-width: 0; }
+.vtp-password-field > input { box-sizing: border-box; width: 100%; padding-inline-end: 48px !important; }
+.vtp-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px !important;
+    padding: 0 !important;
+    transform: translateY(-50%);
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    color: var(--color-text-secondary) !important;
+    cursor: pointer;
+}
+.vtp-password-toggle:hover { background: var(--color-surface-secondary) !important; color: var(--color-text) !important; }
+.vtp-password-toggle:active:not(:disabled) { background: var(--color-surface-selected) !important; color: var(--color-primary-text) !important; }
+.vtp-password-toggle svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .vtp-clear-button {
     display: none;
     position: absolute;
@@ -710,9 +780,9 @@ body:has(dialog[open]) { overflow: hidden; }
     right: 6px;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    min-width: 30px;
-    min-height: 30px;
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
     padding: 0 !important;
     transform: translateY(-50%);
     border: 0 !important;
@@ -724,7 +794,15 @@ body:has(dialog[open]) { overflow: hidden; }
     line-height: 1;
 }
 .vtp-clear-button:hover:not(:disabled) { background: var(--color-border) !important; color: var(--color-text) !important; }
-.vtp-clearable-input > input[type="search"]::-webkit-search-cancel-button { display: none; }
+.vtp-clear-button:active:not(:disabled) { background: var(--color-surface-selected) !important; color: var(--color-primary-text) !important; }
+@media (min-width: 761px) and (max-width: 1024px) {
+    .vtp-clear-button:not([hidden]) { display: inline-flex; }
+    .vtp-clear-button { width: 44px; min-width: 44px; min-height: 44px; }
+    .vtp-password-toggle { width: 44px; min-width: 44px; min-height: 44px !important; }
+    .vtp-clearable-input > input,
+    .vtp-clearable-input > textarea { padding-inline-end: 54px !important; }
+    .vtp-password-field > input { padding-inline-end: 52px !important; }
+}
 
 @media (max-width: 760px) {
     .vtp-global-nav {
@@ -742,9 +820,12 @@ body:has(dialog[open]) { overflow: hidden; }
     .vtp-global-nav__account, [data-vtp-nav-account] { gap: 6px; }
     .vtp-nav-account-name { max-width: 110px; font-size: 11px; }
     .vtp-clear-button:not([hidden]) { display: inline-flex; }
-    .vtp-clearable-input > .vtp-clear-button { width: 30px; min-width: 30px; min-height: 30px; padding: 0 !important; }
+    .vtp-clearable-input > .vtp-clear-button { width: 44px; min-width: 44px; min-height: 44px; padding: 0 !important; }
+    .vtp-password-field > .vtp-password-toggle { width: 44px; min-width: 44px; min-height: 44px !important; }
     .vtp-clearable-input > input,
-    .vtp-clearable-input > textarea { padding-inline-end: 42px !important; }
+    .vtp-clearable-input > textarea { padding-inline-end: 54px !important; }
+    .vtp-password-field > input { padding-inline-end: 52px !important; }
+    .vtp-clearable-input > input[type="search"]::-webkit-search-cancel-button { display: none; }
 }
 
 .home-page :where(#formSelect) {
