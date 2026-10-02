@@ -35,12 +35,42 @@ let anonymousSearchTimer;
 let showBlockedOnly = false;
 const recreationEntries = new Map();
 
+class AdminSessionExpiredError extends Error {
+    constructor() {
+        super('Phiên quản trị đã hết hạn.');
+        this.name = 'AdminSessionExpiredError';
+        this.code = 'ADMIN_SESSION_EXPIRED';
+    }
+}
+
+class StaleAdminRequestError extends Error {
+    constructor() {
+        super('Yêu cầu thuộc phiên quản trị cũ.');
+        this.name = 'StaleAdminRequestError';
+        this.code = 'STALE_ADMIN_REQUEST';
+    }
+}
+
+function isAdminRequestInterruption(error) {
+    return error instanceof AdminSessionExpiredError || error instanceof StaleAdminRequestError;
+}
+
+function assertCurrentAdminRequest(generation) {
+    if (generation !== authGeneration || authState !== 'authenticated') {
+        throw new StaleAdminRequestError();
+    }
+}
+
 async function api(url, options = {}) {
+    const requestGeneration = authGeneration;
     const response = await fetch(url, options);
-    if (response.status === 401) {
-        throw new Error('Phiên quản trị đã hết hạn.');
+    if (requestGeneration !== authGeneration) throw new StaleAdminRequestError();
+    if (response.status === 401 && url.startsWith('/api/admin/')) {
+        handleAdminUnauthorized();
+        throw new AdminSessionExpiredError();
     }
     const result = response.status === 204 ? null : await response.json();
+    if (requestGeneration !== authGeneration) throw new StaleAdminRequestError();
     if (!response.ok) throw new Error(result?.error || 'Yêu cầu thất bại.');
     return result;
 }
@@ -195,6 +225,7 @@ async function saveEditGroup(group) {
         setSaveStatus(savedCount ? `Đã lưu ${savedCount} mục` : 'Không có thay đổi');
         return true;
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return false;
         setSaveStatus('Lỗi lưu', 'error');
         errorElement.textContent = error.message;
         errorElement.hidden = false;
@@ -351,6 +382,56 @@ document.getElementById('confirmRecreateCode').addEventListener('click', async e
     }
 });
 
+const confirmDialog = document.getElementById('confirmDialog');
+const confirmDialogTitle = document.getElementById('confirmDialogTitle');
+const confirmDialogMessage = document.getElementById('confirmDialogMessage');
+const confirmDialogCancelButton = document.getElementById('confirmDialogCancel');
+const confirmDialogConfirmButton = document.getElementById('confirmDialogConfirm');
+let activeConfirmResolve = null;
+let confirmDialogOpener = null;
+
+function resolveConfirmDialog(result) {
+    if (!activeConfirmResolve) return;
+    const resolve = activeConfirmResolve;
+    activeConfirmResolve = null;
+    resolve(result);
+    if (confirmDialog.open) confirmDialog.close();
+}
+
+confirmDialogCancelButton.addEventListener('click', () => resolveConfirmDialog(false));
+confirmDialogConfirmButton.addEventListener('click', () => resolveConfirmDialog(true));
+confirmDialog.addEventListener('cancel', () => resolveConfirmDialog(false));
+confirmDialog.addEventListener('click', event => {
+    if (event.target === event.currentTarget) resolveConfirmDialog(false);
+});
+confirmDialog.addEventListener('close', () => {
+    resolveConfirmDialog(false);
+    const opener = confirmDialogOpener;
+    confirmDialogOpener = null;
+    if (opener && document.contains(opener) && typeof opener.focus === 'function') opener.focus();
+});
+
+// Promise-based thay cho window.confirm/alert; chỉ 1 phiên xác nhận hoạt động tại một thời điểm.
+function confirmAction({ title, message, confirmLabel = 'Xác nhận', danger = false }) {
+    if (activeConfirmResolve || confirmDialog.open) return Promise.resolve(false);
+    if (typeof confirmDialog.showModal !== 'function') {
+        console.error('Trình duyệt không hỗ trợ hộp thoại xác nhận.');
+        return Promise.resolve(false);
+    }
+
+    confirmDialogTitle.textContent = title || '';
+    confirmDialogMessage.textContent = message || '';
+    confirmDialogConfirmButton.textContent = confirmLabel;
+    confirmDialogConfirmButton.classList.toggle('ui-button--danger', Boolean(danger));
+    confirmDialogConfirmButton.classList.toggle('ui-button--primary', !danger);
+    confirmDialogOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    return new Promise(resolve => {
+        activeConfirmResolve = resolve;
+        confirmDialog.showModal();
+    });
+}
+
 let activeIpHistoryIp = '';
 let activeIpHistoryPage = 1;
 let activeIpHistoryPages = 1;
@@ -368,10 +449,12 @@ async function openIpHistory(ip, label) {
 async function loadIpHistory() {
     const errorMessage = document.getElementById('ipHistoryError');
     const rows = document.getElementById('ipHistoryRows');
+    const requestGeneration = authGeneration;
     errorMessage.hidden = true;
     try {
         const query = new URLSearchParams({ page: String(activeIpHistoryPage) });
         const result = await api(`/api/admin/ips/${encodeURIComponent(activeIpHistoryIp)}/history?${query}`);
+        assertCurrentAdminRequest(requestGeneration);
         activeIpHistoryPages = result.pages;
         document.getElementById('ipHistoryPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} mã`;
         document.getElementById('previousIpHistoryPage').disabled = result.page <= 1;
@@ -396,6 +479,7 @@ async function loadIpHistory() {
             rows.append(row);
         }
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         errorMessage.textContent = error.message;
         errorMessage.hidden = false;
     }
@@ -420,10 +504,12 @@ document.getElementById('nextIpHistoryPage').addEventListener('click', () => {
 });
 
 async function loadHistory() {
+    const requestGeneration = authGeneration;
     historyError.hidden = true;
     const query = new URLSearchParams({ page: String(currentPage), search: searchInput.value.trim() });
     try {
         const result = await api(`/api/admin/history?${query}`);
+        assertCurrentAdminRequest(requestGeneration);
         totalPages = result.pages;
         document.getElementById('historyCount').textContent = result.total.toLocaleString('vi-VN');
         document.getElementById('pageLabel').textContent = `Trang ${result.page} / ${result.pages}`;
@@ -468,12 +554,14 @@ async function loadHistory() {
             historyRows.append(row);
         }
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         historyError.textContent = error.message;
         historyError.hidden = false;
     }
 }
 
 async function loadInventoryAccounts() {
+    const requestGeneration = authGeneration;
     inventoryAccountsError.hidden = true;
     const query = new URLSearchParams({
         page: String(inventoryAccountCurrentPage),
@@ -481,6 +569,7 @@ async function loadInventoryAccounts() {
     });
     try {
         const result = await api(`/api/admin/inventory-accounts?${query}`);
+        assertCurrentAdminRequest(requestGeneration);
         inventoryAccountTotalPages = result.pages;
         document.getElementById('inventoryAccountPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} tài khoản`;
         document.getElementById('previousInventoryAccountPage').disabled = result.page <= 1;
@@ -543,6 +632,7 @@ async function loadInventoryAccounts() {
             inventoryAccountRows.append(row);
         }
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         inventoryAccountsError.textContent = error.message;
         inventoryAccountsError.hidden = false;
     }
@@ -577,6 +667,7 @@ function setInventoryOrdersDay(day) {
 
 async function loadInventoryOrders() {
     if (activeInventoryAccountId === null) return;
+    const requestGeneration = authGeneration;
     inventoryOrdersError.hidden = true;
     const selectedDate = getInventoryOrdersDate(activeInventoryOrdersDay);
     const query = new URLSearchParams({
@@ -588,6 +679,7 @@ async function loadInventoryOrders() {
 
     try {
         const result = await api(`/api/admin/inventory-accounts/${activeInventoryAccountId}/orders?${query}`);
+        assertCurrentAdminRequest(requestGeneration);
         inventoryOrdersTotalPages = result.pages;
         document.getElementById('inventoryOrdersPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} mã trong 3 ngày`;
         document.getElementById('previousInventoryOrdersPage').disabled = result.page <= 1;
@@ -619,15 +711,18 @@ async function loadInventoryOrders() {
             inventoryOrdersRows.append(row);
         }
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         inventoryOrdersError.textContent = error.message;
         inventoryOrdersError.hidden = false;
     }
 }
 
 async function loadIps() {
+    const requestGeneration = authGeneration;
     ipError.hidden = true;
     try {
         const ips = await api('/api/admin/ips');
+        assertCurrentAdminRequest(requestGeneration);
         document.getElementById('uniqueIpCount').textContent = ips.length.toLocaleString('vi-VN');
         document.getElementById('blockedIpCount').textContent = ips
             .filter(entry => entry.blocked)
@@ -699,12 +794,14 @@ async function loadIps() {
             ipRows.append(row);
         }
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         ipError.textContent = error.message;
         ipError.hidden = false;
     }
 }
 
 async function loadAnonymousUsers() {
+    const requestGeneration = authGeneration;
     anonymousUsersError.hidden = true;
     const query = new URLSearchParams({
         page: String(anonymousCurrentPage),
@@ -712,6 +809,7 @@ async function loadAnonymousUsers() {
     });
     try {
         const result = await api(`/api/admin/anonymous-users?${query}`);
+        assertCurrentAdminRequest(requestGeneration);
         anonymousTotalPages = result.pages;
         document.getElementById('anonymousPageLabel').textContent = `Trang ${result.page} / ${result.pages} · ${result.total.toLocaleString('vi-VN')} UID`;
         document.getElementById('previousAnonymousPage').disabled = result.page <= 1;
@@ -738,56 +836,194 @@ async function loadAnonymousUsers() {
             anonymousUserRows.append(row);
         }
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         anonymousUsersError.textContent = error.message;
         anonymousUsersError.hidden = false;
     }
 }
 
-function showAdminInitError(message) {
-    let banner = document.getElementById('adminInitError');
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'adminInitError';
-        banner.style.cssText = 'background:#fee;color:#900;padding:12px;margin:12px 0;border:1px solid #900;font-family:monospace;white-space:pre-wrap;';
-        document.body.prepend(banner);
-    }
-    banner.replaceChildren();
-    const messageText = document.createElement('span');
-    messageText.textContent = message;
-    banner.append(messageText);
+const dashboardHeader = document.querySelector('.topbar');
+const dashboardMain = document.querySelector('main');
+const loginModal = document.getElementById('loginModal');
+const loginModalForm = document.getElementById('loginModalForm');
+const loginModalUsername = document.getElementById('loginModalUsername');
+const loginModalPassword = document.getElementById('loginModalPassword');
+const loginModalError = document.getElementById('loginModalError');
+const loginModalSubmit = document.getElementById('loginModalSubmit');
+const sensitiveDialogIds = [
+    'inventoryAccountCreateDialog', 'lockInventoryAccountDialog', 'resetInventoryPasswordDialog',
+    'inventoryOrdersDialog', 'inventoryOrderQrDialog', 'accountLockedDialog',
+    'createdCodesDialog', 'ipHistoryDialog', 'recreateCodeDialog',
+];
+let authState = 'checking';
+let authGeneration = 0;
+let loginSubmitInFlight = false;
 
-    if (message.includes('HTTP 401')) {
-        const loginLink = document.createElement('a');
-        loginLink.href = '/admin';
-        loginLink.textContent = 'Đăng nhập lại';
-        loginLink.style.cssText = 'display:inline-block;margin:8px 0 0 10px;color:#900;font-weight:700;text-decoration:underline;';
-        banner.append(loginLink);
+function closeSensitiveDialogs() {
+    for (const id of sensitiveDialogIds) {
+        const dialog = document.getElementById(id);
+        if (dialog && dialog.open) dialog.close();
     }
 }
 
-fetch('/api/admin/me').then(async response => {
-    if (response.status === 401) {
-        throw new Error('API /api/admin/me trả HTTP 401 - session không được xác thực.');
+// Xóa dữ liệu quản trị đã render khỏi DOM (không chỉ ẩn bằng CSS) khi logout/hết phiên.
+function clearAdminDomData() {
+    historyRows.replaceChildren();
+    inventoryAccountRows.replaceChildren();
+    anonymousUserRows.replaceChildren();
+    ipRows.replaceChildren();
+    inventoryOrdersRows.replaceChildren();
+    document.getElementById('districtRows').replaceChildren();
+    document.getElementById('communeRows').replaceChildren();
+    document.getElementById('villageRows').replaceChildren();
+    document.getElementById('formFieldRows').replaceChildren();
+    document.getElementById('newCommuneDistrict').replaceChildren();
+    document.getElementById('newVillageCommune').replaceChildren();
+    document.getElementById('ipHistoryRows').replaceChildren();
+    document.getElementById('historyCount').textContent = '—';
+    document.getElementById('uniqueIpCount').textContent = '—';
+    document.getElementById('blockedIpCount').textContent = '—';
+    document.getElementById('adminName').textContent = '';
+    recreationEntries.clear();
+    activeRecreateEntry = null;
+    activeInventoryAccountId = null;
+    activeLockInventoryAccountId = null;
+    activeResetInventoryAccountId = null;
+    activeIpHistoryIp = '';
+    showBlockedOnly = false;
+    currentPage = 1;
+    totalPages = 1;
+    inventoryAccountCurrentPage = 1;
+    inventoryAccountTotalPages = 1;
+    anonymousCurrentPage = 1;
+    anonymousTotalPages = 1;
+    setSaveStatus('');
+    for (const element of [historyError, inventoryAccountsError, anonymousUsersError, ipError, inventoryOrdersError]) {
+        element.hidden = true;
+        element.textContent = '';
     }
-    if (!response.ok) {
-        const detail = await response.text().catch(() => '');
-        throw new Error(`/api/admin/me trả HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+    for (const id of ['geographyError', 'geographyMessage', 'formFieldsError']) {
+        const element = document.getElementById(id);
+        element.hidden = true;
+        element.textContent = '';
     }
-    return response.json();
-}).then(admin => {
-    if (admin) document.getElementById('adminName').textContent = admin.username;
-}).catch(error => {
-    console.error('Lỗi khởi tạo trang quản trị:', error);
-    showAdminInitError(error.message || 'Lỗi không xác định khi tải /api/admin/me.');
+}
+
+// Điểm vào duy nhất cho 401 của API quản trị; chống chuyển trạng thái lặp khi nhiều request cùng thất bại.
+function handleAdminUnauthorized() {
+    if (authState !== 'authenticated' && authState !== 'checking') return;
+    transitionToUnauthenticated();
+}
+
+function transitionToUnauthenticated(message) {
+    if (authState === 'unauthenticated') return;
+    authState = 'unauthenticated';
+    authGeneration += 1;
+    closeSensitiveDialogs();
+    clearAdminDomData();
+    dashboardHeader.hidden = true;
+    dashboardMain.hidden = true;
+    loginModalForm.reset();
+    loginModalSubmit.disabled = false;
+    loginModalSubmit.textContent = 'Đăng nhập';
+    loginModalError.hidden = !message;
+    loginModalError.textContent = message || '';
+    if (!loginModal.open) loginModal.showModal();
+    loginModalUsername.focus();
+}
+
+function transitionToAuthenticated(username) {
+    authState = 'authenticated';
+    authGeneration += 1;
+    document.getElementById('adminName').textContent = username;
+    loginModalForm.reset();
+    loginModalError.hidden = true;
+    if (loginModal.open) loginModal.close();
+    dashboardHeader.hidden = false;
+    dashboardMain.hidden = false;
+    loadHistory();
+    loadInventoryAccounts();
+    loadAnonymousUsers();
+    loadIps();
+    loadGeography();
+    loadFormFields();
+}
+
+loginModal.addEventListener('cancel', event => {
+    if (authState !== 'authenticated') event.preventDefault();
 });
 
+loginModalForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (loginSubmitInFlight) return;
+    loginSubmitInFlight = true;
+    loginModalError.hidden = true;
+    loginModalSubmit.disabled = true;
+    loginModalSubmit.textContent = 'Đang đăng nhập...';
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: loginModalUsername.value,
+                password: loginModalPassword.value,
+            }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Đăng nhập thất bại.');
+
+        const meResponse = await fetch('/api/admin/me');
+        if (!meResponse.ok) throw new Error('Không thể xác nhận phiên đăng nhập. Vui lòng thử lại.');
+        const admin = await meResponse.json();
+        transitionToAuthenticated(admin.username);
+    } catch (error) {
+        loginModalError.textContent = error.message;
+        loginModalError.hidden = false;
+        loginModalPassword.value = '';
+        loginModalPassword.focus();
+    } finally {
+        loginSubmitInFlight = false;
+        loginModalSubmit.disabled = false;
+        loginModalSubmit.textContent = 'Đăng nhập';
+    }
+});
+
+async function checkAdminSession() {
+    authState = 'checking';
+    const requestGeneration = authGeneration;
+    if (!loginModal.open) loginModal.showModal();
+    try {
+        const response = await fetch('/api/admin/me');
+        if (requestGeneration !== authGeneration) return;
+        if (response.status === 401) {
+            transitionToUnauthenticated();
+            return;
+        }
+        if (!response.ok) {
+            transitionToUnauthenticated('Không thể kiểm tra phiên đăng nhập. Vui lòng tải lại trang.');
+            return;
+        }
+        const admin = await response.json();
+        if (requestGeneration !== authGeneration) return;
+        transitionToAuthenticated(admin.username);
+    } catch {
+        if (requestGeneration !== authGeneration) return;
+        transitionToUnauthenticated('Không thể kết nối máy chủ. Vui lòng thử lại.');
+    }
+}
+
 document.getElementById('logoutButton').addEventListener('click', async () => {
+    transitionToUnauthenticated();
     try {
         const response = await fetch('/api/logout', { method: 'POST' });
-        if (!response.ok) throw new Error(`Đăng xuất thất bại (HTTP ${response.status}).`);
-        window.location.replace('/admin');
+        if (!response.ok && response.status !== 401) {
+            console.error(`Đăng xuất thất bại (HTTP ${response.status}).`);
+        }
     } catch (error) {
         console.error('Không thể đăng xuất:', error);
+    } finally {
+        transitionToUnauthenticated();
     }
 });
 
@@ -819,6 +1055,7 @@ document.getElementById('inventoryAccountForm').addEventListener('submit', async
         setSaveStatus(`Đã tạo ${account.username}`);
         await loadInventoryAccounts();
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         inventoryAccountCreateError.textContent = error.message;
         inventoryAccountCreateError.hidden = false;
     }
@@ -845,6 +1082,7 @@ document.getElementById('lockInventoryAccountForm').addEventListener('submit', a
         setSaveStatus('Đã khóa tài khoản');
         await loadInventoryAccounts();
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         lockInventoryAccountError.textContent = error.message;
         lockInventoryAccountError.hidden = false;
     }
@@ -870,6 +1108,7 @@ document.getElementById('resetInventoryPasswordForm').addEventListener('submit',
         form.reset();
         setSaveStatus('Đã đặt lại mật khẩu');
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         resetInventoryPasswordError.textContent = error.message;
         resetInventoryPasswordError.hidden = false;
     }
@@ -903,6 +1142,15 @@ inventoryAccountRows.addEventListener('click', async event => {
         return;
     }
 
+    if (button.dataset.accountAction === 'toggle') {
+        const confirmed = await confirmAction({
+            title: 'Xác nhận mở khóa tài khoản',
+            message: `Mở khóa tài khoản kiểm kê "${row.dataset.username}"? Tài khoản này sẽ đăng nhập được trở lại.`,
+            confirmLabel: 'Mở khóa',
+        });
+        if (!confirmed) return;
+    }
+
     try {
         if (button.dataset.accountAction === 'toggle') {
             await api(`/api/admin/inventory-accounts/${accountId}`, {
@@ -914,6 +1162,7 @@ inventoryAccountRows.addEventListener('click', async event => {
         }
         await loadInventoryAccounts();
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         inventoryAccountsError.textContent = error.message;
         inventoryAccountsError.hidden = false;
     }
@@ -981,9 +1230,20 @@ ipRows.addEventListener('click', async event => {
     if (!button) return;
     const row = button.closest('tr');
     const action = button.dataset.ipAction;
+    const blocked = action === 'block';
+    const ipLabel = row.dataset.label ? `${row.dataset.label} (${row.dataset.ip})` : row.dataset.ip;
+
+    const confirmed = await confirmAction({
+        title: blocked ? 'Xác nhận chặn IP' : 'Xác nhận bỏ chặn IP',
+        message: blocked
+            ? `Chặn địa chỉ IP ${ipLabel}? Người dùng từ IP này có thể bị từ chối truy cập theo cơ chế chặn IP hiện tại.`
+            : `Bỏ chặn địa chỉ IP ${ipLabel}? IP này sẽ được phép truy cập trở lại theo cơ chế hiện tại.`,
+        confirmLabel: blocked ? 'Chặn IP' : 'Bỏ chặn',
+        danger: blocked,
+    });
+    if (!confirmed) return;
 
     try {
-        const blocked = action === 'block';
         setSaveStatus('Đang cập nhật...', 'pending');
         await api('/api/admin/ips', {
             method: 'PUT',
@@ -997,6 +1257,7 @@ ipRows.addEventListener('click', async event => {
         setSaveStatus('Đã cập nhật');
         await Promise.all([loadIps(), loadHistory()]);
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         setSaveStatus('Lỗi cập nhật', 'error');
         ipError.textContent = error.message;
         ipError.hidden = false;
@@ -1121,20 +1382,17 @@ document.getElementById('ipHistoryRows').addEventListener('click', event => {
     if (recreateButton) openRecreateCode(recreationEntries.get(recreateButton.dataset.recreateEntry));
 });
 
-loadHistory();
-loadInventoryAccounts();
-loadAnonymousUsers();
-loadIps();
-loadGeography();
-loadFormFields();
+checkAdminSession();
 
 async function loadGeography() {
     const errorMessage = document.getElementById('geographyError');
+    const requestGeneration = authGeneration;
     const editing = document.querySelector('[data-edit-group="geography"]').dataset.editing === 'true';
     errorMessage.hidden = true;
 
     try {
         const districts = await api('/api/admin/geography');
+        assertCurrentAdminRequest(requestGeneration);
         const districtRows = document.getElementById('districtRows');
         const communeRows = document.getElementById('communeRows');
         const villageRows = document.getElementById('villageRows');
@@ -1343,6 +1601,7 @@ async function loadGeography() {
         }
         if (villageRows.children.length === 0) appendEmptyRow(villageRows, 'Chưa có thôn.', 5);
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         errorMessage.textContent = error.message;
         errorMessage.hidden = false;
     }
@@ -1378,7 +1637,9 @@ function showGeographyMessage(message) {
 }
 
 async function syncGeographySummary() {
+    const requestGeneration = authGeneration;
     const districts = await api('/api/admin/geography');
+    assertCurrentAdminRequest(requestGeneration);
     const districtsById = new Map(districts.map(district => [String(district.id), district]));
     const districtOptions = [
         ...document.querySelectorAll('#newCommuneDistrict option'),
@@ -1424,6 +1685,7 @@ document.getElementById('districtForm').addEventListener('submit', async event =
         showGeographyMessage('Đã thêm thành phố/huyện.');
         await loadGeography();
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         const message = document.getElementById('geographyError');
         message.textContent = error.message;
         message.hidden = false;
@@ -1445,6 +1707,7 @@ document.getElementById('communeForm').addEventListener('submit', async event =>
         showGeographyMessage('Đã thêm xã.');
         await loadGeography();
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         const message = document.getElementById('geographyError');
         message.textContent = error.message;
         message.hidden = false;
@@ -1466,6 +1729,7 @@ document.getElementById('villageForm').addEventListener('submit', async event =>
         showGeographyMessage('Đã thêm thôn.');
         await loadGeography();
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         const message = document.getElementById('geographyError');
         message.textContent = error.message;
         message.hidden = false;
@@ -1485,11 +1749,33 @@ document.querySelector('.geography-section').addEventListener('click', async eve
     const errorMessage = document.getElementById('geographyError');
     errorMessage.hidden = true;
 
-    if (isDelete && !window.confirm(isDistrict
-        ? 'Xóa thành phố/huyện này cùng toàn bộ xã/thôn trực thuộc? Lịch sử mã đã tạo vẫn được giữ lại.'
-        : isVillage
-            ? 'Xóa thôn này khỏi danh sách? Lịch sử mã đã tạo vẫn được giữ lại.'
-            : 'Xóa xã này cùng các thôn trực thuộc? Lịch sử mã đã tạo vẫn được giữ lại.')) return;
+    if (isDelete) {
+        const confirmed = await confirmAction({
+            title: 'Xác nhận xóa',
+            message: isDistrict
+                ? 'Xóa thành phố/huyện này cùng toàn bộ xã/thôn trực thuộc? Lịch sử mã đã tạo vẫn được giữ lại.'
+                : isVillage
+                    ? 'Xóa thôn này khỏi danh sách? Lịch sử mã đã tạo vẫn được giữ lại.'
+                    : 'Xóa xã này cùng các thôn trực thuộc? Lịch sử mã đã tạo vẫn được giữ lại.',
+            confirmLabel: 'Xóa',
+            danger: true,
+        });
+        if (!confirmed) return;
+    }
+
+    if (isVisibility) {
+        const hiding = action.startsWith('hide');
+        const entityLabel = isDistrict ? 'thành phố/huyện' : isVillage ? 'thôn' : 'xã';
+        const name = row.dataset.name;
+        const confirmed = await confirmAction({
+            title: hiding ? 'Xác nhận ẩn địa bàn' : 'Xác nhận hiện địa bàn',
+            message: hiding
+                ? `Ẩn ${entityLabel}${name ? ` "${name}"` : ''}? Địa bàn này sẽ không còn xuất hiện trong danh sách địa chỉ công khai để tạo đơn.`
+                : `Hiện ${entityLabel}${name ? ` "${name}"` : ''}? Địa bàn này sẽ được hiển thị trở lại trong danh sách địa chỉ công khai.`,
+            confirmLabel: hiding ? 'Ẩn' : 'Hiện',
+        });
+        if (!confirmed) return;
+    }
 
     const resource = isDistrict ? 'districts' : isVillage ? 'villages' : 'communes';
     const url = `/api/admin/${resource}/${id}${isVisibility ? '/visibility' : ''}`;
@@ -1510,6 +1796,7 @@ document.querySelector('.geography-section').addEventListener('click', async eve
         showGeographyMessage(isDelete ? 'Đã xóa dữ liệu địa bàn.' : 'Đã cập nhật trạng thái địa bàn.');
         await loadGeography();
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         setSaveStatus(isDelete ? 'Lỗi xóa' : 'Lỗi cập nhật', 'error');
         errorMessage.textContent = error.message;
         errorMessage.hidden = false;
@@ -1519,9 +1806,11 @@ document.querySelector('.geography-section').addEventListener('click', async eve
 async function loadFormFields() {
     const errorMessage = document.getElementById('formFieldsError');
     const rows = document.getElementById('formFieldRows');
+    const requestGeneration = authGeneration;
     errorMessage.hidden = true;
     try {
         const fields = await api('/api/admin/form-fields');
+        assertCurrentAdminRequest(requestGeneration);
         rows.replaceChildren();
         for (const field of fields) {
             const row = document.createElement('tr');
@@ -1589,6 +1878,7 @@ async function loadFormFields() {
         }
         if (fields.length === 0) appendEmptyRow(rows, 'Chưa có trường nhập liệu.', 4);
     } catch (error) {
+        if (isAdminRequestInterruption(error)) return;
         errorMessage.textContent = error.message;
         errorMessage.hidden = false;
     }

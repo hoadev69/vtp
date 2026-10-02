@@ -339,8 +339,7 @@ app.get('/ketqua.html', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
 
 app.get('/admin', (req, res) => {
     logSessionDebug(req, '/admin');
-    const admin = getAdminUser(req);
-    res.sendFile(path.join(__dirname, admin ? 'admin.html' : 'login.html'));
+    res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
 app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/admin.js', '/a7.svg'], (req, res) => {

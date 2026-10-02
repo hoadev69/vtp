@@ -240,6 +240,11 @@ button:disabled { cursor: default; opacity: .45; }
 .dialog-actions .primary-action { border-color: var(--green); background: var(--green); color: var(--color-on-primary); }
 .dialog-actions .primary-action:hover { border-color: var(--green-dark); background: var(--green-dark); }
 
+#confirmDialog { width: min(420px, 92vw); max-width: 420px; }
+
+#loginModal { width: min(380px, 92vw); max-width: 380px; }
+#loginModal .ui-dialog__body { display: grid; gap: var(--space-3); }
+
 @media (max-width: 760px) {
     .topbar { padding: 0 4vw; }
     main { width: 92vw; }

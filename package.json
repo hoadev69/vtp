@@ -18,5 +18,8 @@
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

@@ -117,6 +117,86 @@
         "/^node -e 'const \\{execFileSync\\}=require\\(\"node:child_process\"\\);const current=require\\(\"node:fs\"\\)\\.readFileSync\\(\"index\\.html\",\"utf8\"\\);const prior=execFileSync\\(\"git\",\\[\"show\",\"HEAD\\^:index\\.html\"\\],\\{encoding:\"utf8\"\\}\\);const script=s=>s\\.match\\(/<script>\\(\\[\\\\s\\\\S\\]\\*\\?\\)<\\\\/script>/\\)\\?\\.\\[1\\]\\|\\|\"\";const tags=s=>s\\.replace\\(/<script>\\[\\\\s\\\\S\\]\\*\\?<\\\\/script>/g,\"\"\\)\\.match\\(/<\\\\/\\?\\[a-z\\]\\[\\^>\\]\\*>/gi\\)\\|\\|\\[\\];const structure=s=>tags\\(s\\)\\.map\\(t=>t\\.match\\(/\\^<\\\\/\\?\\(\\[a-z\\]\\+\\)/i\\)\\?\\.\\[1\\]\\.toLowerCase\\(\\)\\|\\|\"\"\\)\\.join\\(\" \"\\);const attrs=s=>\\[\\.\\.\\.s\\.matchAll\\(/\\\\b\\(id\\|name\\|data-\\[\\\\w-\\]\\+\\)\\\\s\\*=\\\\s\\*\\(\\[\"\\\\x27\\]\\)\\(\\[\\^\"\\\\x27\\]\\*\\)\\\\2/g\\)\\]\\.map\\(m=>`\\$\\{m\\[1\\]\\}=\\$\\{m\\[3\\]\\}`\\)\\.sort\\(\\);console\\.log\\(`Inline script unchanged from parent: \\$\\{script\\(prior\\)===script\\(current\\)\\}`\\);console\\.log\\(`Element sequence unchanged: \\$\\{structure\\(prior\\)===structure\\(current\\)\\}`\\);console\\.log\\(`IDs/names/data-\\* unchanged from parent: \\$\\{JSON\\.stringify\\(attrs\\(prior\\)\\)===JSON\\.stringify\\(attrs\\(current\\)\\)\\}`\\)'$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^printf 'env_file='; if \\[\\[ -f \\.env \\]\\]; then printf 'present\\\\n'; else printf 'absent\\\\n'; fi; for key in ADMIN_USERNAME ADMIN_PASSWORD SESSION_SECRET; do if \\[\\[ -n \"\\$\\{!key\\}\" \\]\\]; then printf '%s=set\\\\n' \"\\$key\"; else printf '%s=unset\\\\n' \"\\$key\"; fi; done; printf 'port_3000='; if lsof -iTCP:3000 -sTCP:LISTEN -t >/dev/null 2>&1; then printf 'listening\\\\n'; else printf 'not-listening\\\\n'; fi; for browser in chromium chromium-browser google-chrome firefox; do if command -v \"\\$browser\" >/dev/null 2>&1; then printf 'browser=%s\\\\n' \"\\$browser\"; fi; done; git diff --name-only$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check admin\\.js && node --check server\\.js && git diff --check$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^npx playwright install chromium$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e \"const \\{ chromium \\} = require\\('@playwright/test'\\); \\(async \\(\\) => \\{ const browser = await chromium\\.launch\\(\\{ headless: true \\}\\); console\\.log\\('Chromium launch: OK'\\); await browser\\.close\\(\\); \\}\\)\\(\\)\\.catch\\(error => \\{ console\\.error\\('Chromium launch: FAILED'\\); console\\.error\\(error\\.message\\); process\\.exitCode = 1; \\}\\);\" && npm ls @playwright/test --depth=0 && git diff --check && git diff --stat -- package\\.json package-lock\\.json && git diff -- package\\.json$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cat /etc/os-release; printf '\\\\nUID='; id -u; if command -v sudo >/dev/null 2>&1; then printf 'sudo=binary-present\\\\n'; if sudo -n true >/dev/null 2>&1; then printf 'sudo=noninteractive-authorized\\\\n'; else printf 'sudo=not-authorized-without-prompt\\\\n'; fi; else printf 'sudo=binary-absent\\\\n'; fi$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^ldd /home/codespace/\\.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\\./node_modules/\\.bin/playwright install-deps --help$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^npx playwright install-deps chromium$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^if ldd /home/codespace/\\.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell \\| grep 'not found'; then printf 'missing-libraries-remain\\\\n'; else printf 'all-linked-libraries-found\\\\n'; fi$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^npx playwright install-deps --dry-run chromium$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^sudo -n dpkg --audit; apt-get check$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e \"const \\{ chromium \\} = require\\('@playwright/test'\\); \\(async \\(\\) => \\{ const browser = await chromium\\.launch\\(\\{ headless: true \\}\\); try \\{ const page = await browser\\.newPage\\(\\); await page\\.goto\\('about:blank'\\); console\\.log\\('Chromium launch: OK'\\); console\\.log\\('Blank page: OK'\\); console\\.log\\('Blank page title: ' \\+ JSON\\.stringify\\(await page\\.title\\(\\)\\)\\); \\} finally \\{ await browser\\.close\\(\\); console\\.log\\('Browser close: OK'\\); \\} \\}\\)\\(\\)\\.catch\\(error => \\{ console\\.error\\('Chromium smoke test: FAILED'\\); console\\.error\\(error\\.message\\); process\\.exitCode = 1; \\}\\);\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^sudo -n apt-get check && sudo -n dpkg --audit$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^dpkg-query -W -f='\\$\\{db:Status-Abbrev\\} \\$\\{binary:Package\\}\\\\n' libatk1\\.0-0t64 libatk-bridge2\\.0-0t64 libatspi2\\.0-0t64 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxkbcommon0 libasound2t64$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e \"const fs = require\\('node:fs'\\); const dotenv = require\\('dotenv'\\); const fileEnv = fs\\.existsSync\\('\\.env'\\) \\? dotenv\\.parse\\(fs\\.readFileSync\\('\\.env', 'utf8'\\)\\) : \\{\\}; const username = \\(process\\.env\\.ADMIN_USERNAME \\|\\| fileEnv\\.ADMIN_USERNAME \\|\\| ''\\)\\.trim\\(\\)\\.toLowerCase\\(\\); console\\.log\\('project_env_file=' \\+ \\(fs\\.existsSync\\('\\.env'\\) \\? 'present' : 'absent'\\)\\); console\\.log\\('production_admin_username_configured=' \\+ \\(username \\? 'yes' : 'no'\\)\\);\"; if lsof -iTCP:43127 -sTCP:LISTEN -t >/dev/null 2>&1; then printf 'test_port_43127=in-use\\\\n'; else printf 'test_port_43127=free\\\\n'; fi; node -e \"const path=require\\('node:path'\\); const os=require\\('node:os'\\); const crypto=require\\('node:crypto'\\); const test=path\\.resolve\\(os\\.tmpdir\\(\\), 'vtp-auth-test-' \\+ crypto\\.randomUUID\\(\\), 'history\\.sqlite'\\); const prod=path\\.resolve\\('data/history\\.sqlite'\\); console\\.log\\('candidate_test_db_is_absolute=' \\+ path\\.isAbsolute\\(test\\)\\); console\\.log\\('candidate_test_db_is_default=' \\+ \\(test === prod\\)\\); console\\.log\\('candidate_test_db_outside_repo=' \\+ !test\\.startsWith\\(path\\.resolve\\('\\.'\\) \\+ path\\.sep\\)\\);\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const fs = require\\(\"node:fs\"\\); const dotenv = require\\(\"dotenv\"\\); const fileEnv = fs\\.existsSync\\(\"\\.env\"\\) \\? dotenv\\.parse\\(fs\\.readFileSync\\(\"\\.env\", \"utf8\"\\)\\) : \\{\\}; const username = \\(process\\.env\\.ADMIN_USERNAME \\|\\| fileEnv\\.ADMIN_USERNAME \\|\\| \"\"\\)\\.trim\\(\\)\\.toLowerCase\\(\\); console\\.log\\(\"project_env_file=\" \\+ \\(fs\\.existsSync\\(\"\\.env\"\\) \\? \"present\" : \"absent\"\\)\\); console\\.log\\(\"production_admin_username_configured=\" \\+ \\(username \\? \"yes\" : \"no\"\\)\\);'; if lsof -iTCP:43127 -sTCP:LISTEN -t >/dev/null 2>&1; then printf 'test_port_43127=in-use\\\\n'; else printf 'test_port_43127=free\\\\n'; fi; node -e 'const path=require\\(\"node:path\"\\); const os=require\\(\"node:os\"\\); const crypto=require\\(\"node:crypto\"\\); const root=path\\.resolve\\(\"\\.\"\\); const test=path\\.resolve\\(os\\.tmpdir\\(\\), \"vtp-auth-test-\" \\+ crypto\\.randomUUID\\(\\), \"history\\.sqlite\"\\); const prod=path\\.resolve\\(\"data/history\\.sqlite\"\\); console\\.log\\(\"candidate_test_db_is_absolute=\" \\+ path\\.isAbsolute\\(test\\)\\); console\\.log\\(\"candidate_test_db_is_default=\" \\+ \\(test === prod\\)\\); console\\.log\\(\"candidate_test_db_outside_repo=\" \\+ \\(test\\.startsWith\\(root \\+ path\\.sep\\) === false\\)\\);'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const fs=require\\(\"node:fs\"\\); const path=require\\(\"node:path\"\\); const root=path\\.resolve\\(\"\\.\"\\); const dir=path\\.resolve\\(\"/tmp/vtp-auth-test-2026\"\\); const db=path\\.join\\(dir,\"history\\.sqlite\"\\); const production=path\\.resolve\\(root,\"data/history\\.sqlite\"\\); console\\.log\\(\"test_db_path=\"\\+db\\); console\\.log\\(\"is_absolute=\"\\+path\\.isAbsolute\\(db\\)\\); console\\.log\\(\"outside_workspace=\"\\+\\(db\\.startsWith\\(root\\+path\\.sep\\)===false\\)\\); console\\.log\\(\"equals_default_db=\"\\+\\(db===production\\)\\); console\\.log\\(\"db_exists=\"\\+fs\\.existsSync\\(db\\)\\); console\\.log\\(\"wal_exists=\"\\+fs\\.existsSync\\(db\\+\"-wal\"\\)\\); console\\.log\\(\"shm_exists=\"\\+fs\\.existsSync\\(db\\+\"-shm\"\\)\\); console\\.log\\(\"parent_exists=\"\\+fs\\.existsSync\\(dir\\)\\); console\\.log\\(\"DATABASE_PATH_env=\"\\+\\(process\\.env\\.DATABASE_PATH \\? \"set\" : \"unset\"\\)\\);'; if lsof -iTCP:43127 -sTCP:LISTEN -t >/dev/null 2>&1; then printf 'port_43127=in-use\\\\n'; else printf 'port_43127=free\\\\n'; fi$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node --check prepare-vtp-auth-test\\.js && git diff --check -- prepare-vtp-auth-test\\.js && git diff --stat -- prepare-vtp-auth-test\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^command -v node; if \\[\\[ -v NODE_OPTIONS \\]\\]; then printf 'NODE_OPTIONS=set \\(value withheld\\)\\\\n'; else printf 'NODE_OPTIONS=unset\\\\n'; fi$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^env -u NODE_OPTIONS /home/codespace/nvm/current/bin/node --check prepare-vtp-auth-test\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }
