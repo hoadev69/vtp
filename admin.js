@@ -34,6 +34,7 @@ let activeInventoryOrdersDay = 'today';
 let anonymousSearchTimer;
 let showBlockedOnly = false;
 const recreationEntries = new Map();
+let geographyData = [];
 
 class AdminSessionExpiredError extends Error {
     constructor() {
@@ -260,10 +261,6 @@ document.querySelectorAll('[data-edit-group]').forEach(button => {
                 if (row.classList.contains('is-editing')) restoreRowValues(group, row);
                 setEditingMode(row, false);
             });
-            if (group === 'geography') {
-                document.getElementById('districtForm').reset();
-                document.getElementById('communeForm').reset();
-            }
         } else {
             rows.filter(row => group !== 'ips' || row.dataset.ip !== 'unknown')
                 .forEach(row => setEditingMode(row, true));
@@ -853,7 +850,7 @@ const loginModalSubmit = document.getElementById('loginModalSubmit');
 const sensitiveDialogIds = [
     'inventoryAccountCreateDialog', 'lockInventoryAccountDialog', 'resetInventoryPasswordDialog',
     'inventoryOrdersDialog', 'inventoryOrderQrDialog', 'accountLockedDialog',
-    'createdCodesDialog', 'ipHistoryDialog', 'recreateCodeDialog',
+    'createdCodesDialog', 'ipHistoryDialog', 'recreateCodeDialog', 'addAddressDialog',
 ];
 let authState = 'checking';
 let authGeneration = 0;
@@ -877,8 +874,9 @@ function clearAdminDomData() {
     document.getElementById('communeRows').replaceChildren();
     document.getElementById('villageRows').replaceChildren();
     document.getElementById('formFieldRows').replaceChildren();
-    document.getElementById('newCommuneDistrict').replaceChildren();
-    document.getElementById('newVillageCommune').replaceChildren();
+    document.getElementById('addAddressDistrict').replaceChildren();
+    document.getElementById('addAddressCommune').replaceChildren();
+    document.getElementById('addAddressForm').reset();
     document.getElementById('ipHistoryRows').replaceChildren();
     document.getElementById('historyCount').textContent = '—';
     document.getElementById('uniqueIpCount').textContent = '—';
@@ -890,6 +888,7 @@ function clearAdminDomData() {
     activeLockInventoryAccountId = null;
     activeResetInventoryAccountId = null;
     activeIpHistoryIp = '';
+    geographyData = [];
     showBlockedOnly = false;
     currentPage = 1;
     totalPages = 1;
@@ -1384,6 +1383,26 @@ document.getElementById('ipHistoryRows').addEventListener('click', event => {
 
 checkAdminSession();
 
+function updateAddressCommuneOptions() {
+    const districtSelect = document.getElementById('addAddressDistrict');
+    const communeSelect = document.getElementById('addAddressCommune');
+    const selectedDistrictId = districtSelect.value;
+    communeSelect.replaceChildren();
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Chọn xã';
+    communeSelect.append(placeholder);
+
+    const district = geographyData.find(item => String(item.id) === selectedDistrictId);
+    for (const commune of district?.communes || []) {
+        const option = document.createElement('option');
+        option.value = commune.id;
+        option.textContent = commune.name;
+        communeSelect.append(option);
+    }
+}
+
 async function loadGeography() {
     const errorMessage = document.getElementById('geographyError');
     const requestGeneration = authGeneration;
@@ -1396,31 +1415,30 @@ async function loadGeography() {
         const districtRows = document.getElementById('districtRows');
         const communeRows = document.getElementById('communeRows');
         const villageRows = document.getElementById('villageRows');
-        const newCommuneDistrict = document.getElementById('newCommuneDistrict');
-        const newVillageCommune = document.getElementById('newVillageCommune');
+        const addAddressDistrict = document.getElementById('addAddressDistrict');
+        const addAddressCommune = document.getElementById('addAddressCommune');
         districtRows.replaceChildren();
         communeRows.replaceChildren();
         villageRows.replaceChildren();
-        newCommuneDistrict.replaceChildren();
-        newVillageCommune.replaceChildren();
+        addAddressDistrict.replaceChildren();
+        addAddressCommune.replaceChildren();
+        geographyData = districts;
+
+        const districtPlaceholder = document.createElement('option');
+        districtPlaceholder.value = '';
+        districtPlaceholder.textContent = 'Chọn huyện';
+        addAddressDistrict.append(districtPlaceholder);
 
         const allCommunes = districts.flatMap(district => district.communes.map(commune => ({
             ...commune,
             districtId: district.id,
             districtName: district.name,
         })));
-        allCommunes.forEach(commune => {
-            const option = document.createElement('option');
-            option.value = commune.id;
-            option.textContent = `${commune.districtName} · ${commune.name}`;
-            newVillageCommune.append(option);
-        });
-
         for (const district of districts) {
             const districtOption = document.createElement('option');
             districtOption.value = district.id;
             districtOption.textContent = district.name;
-            newCommuneDistrict.append(districtOption);
+            addAddressDistrict.append(districtOption);
 
             const row = document.createElement('tr');
             row.dataset.rowType = 'district';
@@ -1592,6 +1610,7 @@ async function loadGeography() {
             }
         }
 
+        updateAddressCommuneOptions();
         if (districts.length === 0) {
             appendEmptyRow(districtRows, 'Chưa có thành phố hoặc huyện.', 5);
             appendEmptyRow(communeRows, 'Chưa có xã.', 4);
@@ -1642,7 +1661,7 @@ async function syncGeographySummary() {
     assertCurrentAdminRequest(requestGeneration);
     const districtsById = new Map(districts.map(district => [String(district.id), district]));
     const districtOptions = [
-        ...document.querySelectorAll('#newCommuneDistrict option'),
+        ...document.querySelectorAll('#addAddressDistrict option'),
         ...document.querySelectorAll('.commune-district option'),
     ];
 
@@ -1670,69 +1689,116 @@ async function syncGeographySummary() {
     }
 }
 
-document.getElementById('districtForm').addEventListener('submit', async event => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    try {
-        const editButton = document.querySelector('[data-edit-group="geography"]');
-        if (editButton.dataset.editing === 'true' && !await saveEditGroup('geography')) return;
-        await api('/api/admin/districts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: values.get('name'), kind: values.get('kind') }),
-        });
-        event.currentTarget.reset();
-        showGeographyMessage('Đã thêm thành phố/huyện.');
-        await loadGeography();
-    } catch (error) {
-        if (isAdminRequestInterruption(error)) return;
-        const message = document.getElementById('geographyError');
-        message.textContent = error.message;
-        message.hidden = false;
-    }
+const addAddressDialog = document.getElementById('addAddressDialog');
+const addAddressForm = document.getElementById('addAddressForm');
+const addAddressType = document.getElementById('addAddressType');
+const addAddressDistrict = document.getElementById('addAddressDistrict');
+const addAddressCommune = document.getElementById('addAddressCommune');
+const addAddressName = document.getElementById('addAddressName');
+const addAddressError = document.getElementById('addAddressError');
+const submitAddAddress = document.getElementById('submitAddAddress');
+const cancelAddAddress = document.getElementById('cancelAddAddress');
+let addAddressSaveInFlight = false;
+
+function setAddAddressSaving(saving) {
+    addAddressSaveInFlight = saving;
+    addAddressForm.setAttribute('aria-busy', String(saving));
+    addAddressType.disabled = saving;
+    addAddressName.disabled = saving;
+    addAddressDistrict.disabled = saving || document.getElementById('addAddressDistrictField').inert;
+    addAddressCommune.disabled = saving || document.getElementById('addAddressCommuneField').inert;
+    cancelAddAddress.disabled = saving;
+    submitAddAddress.disabled = saving;
+    submitAddAddress.textContent = saving ? 'Đang lưu...' : 'Lưu';
+    if (saving) submitAddAddress.dataset.loading = 'true';
+    else delete submitAddAddress.dataset.loading;
+}
+
+function updateAddAddressFields() {
+    const type = addAddressType.value;
+    const needsDistrict = type !== 'district';
+    const needsCommune = type === 'village';
+    const districtField = document.getElementById('addAddressDistrictField');
+    const communeField = document.getElementById('addAddressCommuneField');
+    districtField.classList.toggle('is-visible', needsDistrict);
+    districtField.setAttribute('aria-hidden', String(!needsDistrict));
+    districtField.inert = !needsDistrict;
+    communeField.classList.toggle('is-visible', needsCommune);
+    communeField.setAttribute('aria-hidden', String(!needsCommune));
+    communeField.inert = !needsCommune;
+    addAddressDistrict.required = needsDistrict;
+    addAddressDistrict.disabled = !needsDistrict;
+    addAddressCommune.required = needsCommune;
+    addAddressCommune.disabled = !needsCommune;
+    document.getElementById('addAddressNameLabel').textContent = type === 'district'
+        ? 'Tên huyện' : type === 'commune' ? 'Tên xã' : 'Tên thôn';
+}
+
+document.getElementById('addAddressButton').addEventListener('click', () => {
+    addAddressForm.reset();
+    addAddressError.hidden = true;
+    updateAddAddressFields();
+    updateAddressCommuneOptions();
+    addAddressDialog.showModal();
+    addAddressType.focus();
 });
 
-document.getElementById('communeForm').addEventListener('submit', async event => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    try {
-        const editButton = document.querySelector('[data-edit-group="geography"]');
-        if (editButton.dataset.editing === 'true' && !await saveEditGroup('geography')) return;
-        await api('/api/admin/communes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: values.get('name'), districtId: values.get('districtId') }),
-        });
-        event.currentTarget.reset();
-        showGeographyMessage('Đã thêm xã.');
-        await loadGeography();
-    } catch (error) {
-        if (isAdminRequestInterruption(error)) return;
-        const message = document.getElementById('geographyError');
-        message.textContent = error.message;
-        message.hidden = false;
-    }
+cancelAddAddress.addEventListener('click', () => {
+    if (!addAddressSaveInFlight) addAddressDialog.close();
 });
+addAddressDialog.addEventListener('cancel', event => {
+    if (addAddressSaveInFlight) event.preventDefault();
+});
+addAddressDialog.addEventListener('click', event => {
+    if (!addAddressSaveInFlight && event.target === event.currentTarget) addAddressDialog.close();
+});
+addAddressType.addEventListener('change', updateAddAddressFields);
+addAddressDistrict.addEventListener('change', updateAddressCommuneOptions);
 
-document.getElementById('villageForm').addEventListener('submit', async event => {
+addAddressForm.addEventListener('submit', async event => {
     event.preventDefault();
-    const values = new FormData(event.currentTarget);
+    if (addAddressSaveInFlight) return;
+    setAddAddressSaving(true);
+    addAddressError.hidden = true;
+    const type = addAddressType.value;
+    const editButton = document.querySelector('[data-edit-group="geography"]');
+
     try {
-        const editButton = document.querySelector('[data-edit-group="geography"]');
         if (editButton.dataset.editing === 'true' && !await saveEditGroup('geography')) return;
-        await api('/api/admin/villages', {
+
+        let url;
+        let body;
+        if (type === 'district') {
+            url = '/api/admin/districts';
+            body = { name: addAddressName.value.trim(), kind: 'district' };
+        } else if (type === 'commune') {
+            url = '/api/admin/communes';
+            body = { name: addAddressName.value.trim(), districtId: addAddressDistrict.value };
+        } else {
+            url = '/api/admin/villages';
+            body = { name: addAddressName.value.trim(), communeId: addAddressCommune.value };
+        }
+
+        setSaveStatus('Đang thêm địa chỉ...', 'pending');
+        await api(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: values.get('name'), communeId: values.get('communeId') }),
+            body: JSON.stringify(body),
         });
-        event.currentTarget.reset();
-        showGeographyMessage('Đã thêm thôn.');
+        addAddressForm.reset();
+        addAddressDialog.close();
+        setSaveStatus('Đã thêm địa chỉ');
+        showGeographyMessage('Đã thêm địa chỉ.');
         await loadGeography();
     } catch (error) {
         if (isAdminRequestInterruption(error)) return;
-        const message = document.getElementById('geographyError');
-        message.textContent = error.message;
-        message.hidden = false;
+        setSaveStatus('Lỗi thêm địa chỉ', 'error');
+        addAddressError.textContent = error instanceof TypeError
+            ? 'Không thể kết nối máy chủ. Hãy kiểm tra kết nối rồi thử lại.'
+            : error.message || 'Không thể lưu địa chỉ. Vui lòng thử lại.';
+        addAddressError.hidden = false;
+    } finally {
+        setAddAddressSaving(false);
     }
 });
 

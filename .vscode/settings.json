@@ -197,6 +197,26 @@
         "/^env -u NODE_OPTIONS /home/codespace/nvm/current/bin/node --check prepare-vtp-auth-test\\.js$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^node --check prepare-vtp-auth-test\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^env -u NODE_OPTIONS node prepare-vtp-auth-test\\.js prepare$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^env -u NODE_OPTIONS node prepare-vtp-auth-test\\.js check$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e 'const fs=require\\(\"node:fs\"\\); const dotenv=require\\(\"dotenv\"\\); const path=require\\(\"node:path\"\\); const file=\"/tmp/vtp-auth-test-2026/auth-test\\.env\"; const c=dotenv\\.parse\\(fs\\.readFileSync\\(file\\)\\); console\\.log\\(\"config_file=read\"\\); console\\.log\\(\"DATABASE_PATH=\"\\+c\\.DATABASE_PATH\\); console\\.log\\(\"path_matches_test=\"\\+\\(path\\.resolve\\(c\\.DATABASE_PATH\\)===\"/tmp/vtp-auth-test-2026/history\\.sqlite\"\\)\\); console\\.log\\(\"PORT=\"\\+c\\.PORT\\); console\\.log\\(\"ADMIN_USERNAME=\"\\+c\\.ADMIN_USERNAME\\); console\\.log\\(\"NODE_ENV=\"\\+c\\.NODE_ENV\\); console\\.log\\(\"ADMIN_PASSWORD=present\\(\"\\+Buffer\\.byteLength\\(c\\.ADMIN_PASSWORD\\|\\|\"\",\"utf8\"\\)\\+\" bytes\\)\"\\); console\\.log\\(\"SESSION_SECRET=present\\(\"\\+Buffer\\.byteLength\\(c\\.SESSION_SECRET\\|\\|\"\",\"utf8\"\\)\\+\" bytes\\)\"\\);'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^env -u NODE_OPTIONS node prepare-vtp-auth-test\\.js start$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

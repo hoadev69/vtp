@@ -157,10 +157,6 @@ button:disabled { cursor: default; opacity: .45; }
 .ip-actions .block-button, .geography-actions .delete-button { color: var(--warning); }
 .ip-actions .unblock-button { color: var(--green-dark); }
 .empty-row { padding: 28px 10px; color: var(--muted); text-align: center; }
-.geography-form { display: flex; align-items: end; gap: 10px; margin: 14px 0 18px; }
-.geography-form label { display: grid; gap: 5px; width: min(280px, 31%); color: var(--muted); font-size: 11px; font-weight: 700; }
-.geography-form button { border-color: var(--green); background: var(--green); color: var(--color-on-primary); }
-.geography-form button:hover:not(:disabled) { border-color: var(--green-dark); background: var(--green-dark); color: var(--color-on-primary); }
 .commune-heading { margin-top: 30px; }
 
 .ip-history-dialog {
@@ -242,6 +238,74 @@ button:disabled { cursor: default; opacity: .45; }
 
 #confirmDialog { width: min(420px, 92vw); max-width: 420px; }
 
+#addAddressDialog {
+    width: min(420px, 92vw);
+    max-width: 420px;
+    opacity: 0;
+    transform: translateY(7px) scale(.985);
+    transition: opacity 180ms ease, transform 180ms ease,
+        display 180ms allow-discrete, overlay 180ms allow-discrete;
+}
+#addAddressDialog[open] { opacity: 1; transform: translateY(0) scale(1); }
+#addAddressDialog::backdrop {
+    background: transparent;
+    backdrop-filter: blur(0);
+    transition: background-color 180ms ease, backdrop-filter 180ms ease,
+        display 180ms allow-discrete, overlay 180ms allow-discrete;
+}
+#addAddressDialog[open]::backdrop { background: var(--color-overlay); backdrop-filter: blur(3px); }
+@starting-style {
+    #addAddressDialog[open] { opacity: 0; transform: translateY(7px) scale(.985); }
+    #addAddressDialog[open]::backdrop { background: transparent; backdrop-filter: blur(0); }
+}
+#addAddressDialog .add-address-form { display: grid; gap: var(--space-3); }
+#addAddressDialog .add-address-conditional {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: grid-template-rows 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+#addAddressDialog .add-address-conditional.is-visible { grid-template-rows: 1fr; opacity: 1; transform: translateY(0); }
+#addAddressDialog .add-address-conditional__content { min-height: 0; overflow: hidden; }
+#submitAddAddress {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+}
+#submitAddAddress:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
+#submitAddAddress:active:not(:disabled) { transform: scale(.98); filter: brightness(.96); }
+#submitAddAddress:disabled { cursor: progress; }
+#submitAddAddress[data-loading="true"]::after {
+    width: 13px;
+    height: 13px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    content: '';
+    animation: add-address-spin 700ms linear infinite;
+}
+#geographyError:not([hidden]), #geographyMessage:not([hidden]), #addAddressError:not([hidden]) {
+    animation: add-address-notice-in 180ms ease-out both;
+}
+@keyframes add-address-spin { to { transform: rotate(360deg); } }
+@keyframes add-address-notice-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    #addAddressDialog, #addAddressDialog::backdrop,
+    #addAddressDialog .add-address-conditional, #submitAddAddress {
+        transition-duration: 0.01ms;
+    }
+    #submitAddAddress[data-loading="true"]::after { animation-duration: 0.01ms; }
+    #geographyError:not([hidden]), #geographyMessage:not([hidden]), #addAddressError:not([hidden]) {
+        animation: none;
+    }
+}
+
 #loginModal { width: min(380px, 92vw); max-width: 380px; }
 #loginModal .ui-dialog__body { display: grid; gap: var(--space-3); }
 
@@ -258,9 +322,6 @@ button:disabled { cursor: default; opacity: .45; }
     .vtp-ui .section-heading { align-items: stretch; flex-direction: column; }
     .edit-toolbar { justify-content: flex-start; }
     .search-field { width: 100%; }
-    .geography-form { align-items: stretch; flex-direction: column; }
-    .geography-form label { width: 100%; }
-    .geography-form button { width: 100%; }
     .ip-history-dialog { padding: 16px 12px; }
     .recreate-code-dialog { padding: 16px 12px; }
     .account-dialog { padding: 16px 12px; }

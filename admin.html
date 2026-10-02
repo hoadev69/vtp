@@ -175,6 +175,7 @@
                     <h2 id="geographyTitle">Thành phố và huyện</h2>
                 </div>
                 <div class="edit-toolbar">
+                    <button id="addAddressButton" type="button" class="ui-button ui-button--primary">Thêm địa chỉ</button>
                     <button type="button" data-edit-group="geography">Sửa địa bàn</button>
                     <button type="button" class="group-save" data-group-action="save" data-group="geography" hidden>Lưu thay đổi</button>
                     <button type="button" class="group-cancel" data-group-action="cancel" data-group="geography" hidden>Hủy</button>
@@ -182,20 +183,6 @@
             </div>
             <p id="geographyError" class="error-message" role="alert" hidden></p>
             <p id="geographyMessage" class="success-message" role="status" hidden></p>
-            <div id="geographyCreateForms" data-edit-form-group="geography" hidden>
-                <form id="districtForm" class="geography-form">
-                <label>Loại đơn vị
-                    <select name="kind" required>
-                        <option value="city">Thành phố</option>
-                        <option value="district">Huyện</option>
-                    </select>
-                </label>
-                <label>Tên hiển thị
-                    <input name="name" maxlength="80" placeholder="Ví dụ: TP.Lào Cai" required>
-                </label>
-                <button type="submit">Thêm thành phố/huyện</button>
-                </form>
-            </div>
             <div class="table-scroll">
                 <table>
                     <thead>
@@ -208,17 +195,6 @@
             <div class="section-heading ui-section-header commune-heading">
                 <h2>Xã</h2>
             </div>
-            <div class="geography-create-forms" data-edit-form-group="geography" hidden>
-            <form id="communeForm" class="geography-form">
-                <label>Thành phố/Huyện
-                    <select name="districtId" id="newCommuneDistrict" required></select>
-                </label>
-                <label>Tên xã
-                    <input name="name" maxlength="80" required>
-                </label>
-                <button type="submit">Thêm xã</button>
-            </form>
-            </div>
             <div class="table-scroll">
                 <table>
                     <thead>
@@ -230,17 +206,6 @@
 
             <div class="section-heading ui-section-header commune-heading">
                 <h2>Thôn</h2>
-            </div>
-            <div class="geography-create-forms" data-edit-form-group="geography" hidden>
-                <form id="villageForm" class="geography-form">
-                    <label>Xã
-                        <select name="communeId" id="newVillageCommune" required></select>
-                    </label>
-                    <label>Tên thôn
-                        <input name="name" maxlength="80" required>
-                    </label>
-                    <button type="submit">Thêm thôn</button>
-                </form>
             </div>
             <div class="table-scroll">
                 <table>
@@ -276,6 +241,43 @@
             <p class="form-hint">Trường đang hiện dùng giá trị mặc định làm gợi ý ban đầu. Trường bị ẩn sẽ dùng cố định giá trị mặc định khi tạo tem.</p>
         </section>
     </main>
+
+    <dialog id="addAddressDialog" class="ui-dialog" aria-labelledby="addAddressTitle">
+        <div class="ui-dialog__header">
+            <h2 id="addAddressTitle">Thêm địa chỉ</h2>
+        </div>
+        <form id="addAddressForm">
+            <div class="ui-dialog__body add-address-form">
+                <label class="ui-label" for="addAddressType">Loại địa chỉ</label>
+                <select id="addAddressType" class="ui-select" required>
+                    <option value="district">Huyện</option>
+                    <option value="commune">Xã</option>
+                    <option value="village">Thôn</option>
+                </select>
+                <div id="addAddressDistrictField" class="add-address-conditional" aria-hidden="true" inert>
+                    <div class="add-address-conditional__content ui-form-field">
+                        <label class="ui-label" for="addAddressDistrict">Huyện</label>
+                        <select id="addAddressDistrict" class="ui-select" name="districtId" disabled></select>
+                    </div>
+                </div>
+                <div id="addAddressCommuneField" class="add-address-conditional" aria-hidden="true" inert>
+                    <div class="add-address-conditional__content ui-form-field">
+                        <label class="ui-label" for="addAddressCommune">Xã</label>
+                        <select id="addAddressCommune" class="ui-select" name="communeId" disabled></select>
+                    </div>
+                </div>
+                <div class="ui-form-field">
+                    <label id="addAddressNameLabel" class="ui-label" for="addAddressName">Tên huyện</label>
+                    <input id="addAddressName" class="ui-input" name="name" maxlength="80" required>
+                </div>
+                <p id="addAddressError" class="ui-alert ui-alert--danger" role="alert" hidden></p>
+            </div>
+            <div class="ui-dialog__footer">
+                <button id="cancelAddAddress" class="ui-button" type="button">Hủy</button>
+                <button id="submitAddAddress" class="ui-button ui-button--primary" type="submit">Lưu</button>
+            </div>
+        </form>
+    </dialog>
 
     <dialog id="inventoryAccountCreateDialog" class="account-dialog" aria-labelledby="inventoryAccountCreateTitle">
         <div class="dialog-heading">

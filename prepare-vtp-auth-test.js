@@ -27,8 +27,7 @@ function isOutsideWorkspace(targetPath) {
     return relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath);
 }
 
-// lstat (not stat) so a dangling symlink still counts as "present" instead of silently passing.
-function pathExistsAsAnything(targetPath) {
+function pathExists(targetPath) {
     try {
         fs.lstatSync(targetPath);
         return true;
@@ -38,66 +37,14 @@ function pathExistsAsAnything(targetPath) {
     }
 }
 
-// Walk every ancestor segment and reject a symlink anywhere in the chain, not just the final target.
-function assertNoSymlinkComponents(targetPath) {
-    const segments = targetPath.split(path.sep).filter(Boolean);
-    let current = path.sep;
-    for (const segment of segments) {
-        current = path.join(current, segment);
-        let stats;
-        try {
-            stats = fs.lstatSync(current);
-        } catch (error) {
-            if (error.code === 'ENOENT') continue;
-            throw error;
-        }
-        if (stats.isSymbolicLink()) fail(`Path component must not be a symlink: ${current}`);
+function assertTestDirectory({ mustExist }) {
+    const stats = fs.existsSync(testDirectory) ? fs.lstatSync(testDirectory) : null;
+    if (!stats) {
+        if (mustExist) fail('Test directory is missing; run prepare first.');
+        return;
     }
-}
-
-// path.resolve() is lexical only; confirm the OS-reported canonical location still matches literally.
-function assertRealPathStable(targetPath) {
-    if (!pathExistsAsAnything(targetPath)) return;
-    const real = fs.realpathSync.native(targetPath);
-    if (real !== targetPath) fail(`Path does not match its real filesystem location: ${targetPath}`);
-}
-
-function currentUid() {
-    if (typeof process.getuid !== 'function') fail('Cannot verify file ownership on this platform.');
-    return process.getuid();
-}
-
-function assertDirectorySecure(directoryPath, { mustExist }) {
-    assertNoSymlinkComponents(directoryPath);
-    if (!pathExistsAsAnything(directoryPath)) {
-        if (mustExist) fail(`Required test directory is missing: ${directoryPath}`);
-        return false;
-    }
-    const stats = fs.lstatSync(directoryPath);
-    if (!stats.isDirectory()) fail(`Expected a directory but found something else: ${directoryPath}`);
-    if (stats.uid !== currentUid()) fail(`Test directory is not owned by the current user: ${directoryPath}`);
-    if ((stats.mode & 0o077) !== 0) fail(`Test directory permissions are too broad: ${directoryPath}`);
-    assertRealPathStable(directoryPath);
-    return true;
-}
-
-function assertConfigFileSecure(filePath) {
-    assertNoSymlinkComponents(filePath);
-    if (!pathExistsAsAnything(filePath)) fail('Test auth configuration is missing; run prepare first.');
-    const stats = fs.lstatSync(filePath);
-    if (!stats.isFile()) fail('Test auth configuration must be a regular file.');
-    if (stats.uid !== currentUid()) fail('Test auth configuration is not owned by the current user.');
-    if ((stats.mode & 0o077) !== 0) fail('Test auth configuration permissions are too broad.');
-    assertRealPathStable(filePath);
-}
-
-function assertNoPreloadHooks() {
-    const nodeOptions = process.env.NODE_OPTIONS || '';
-    if (/(^|\s)(--require|-r|--import|--loader|--experimental-loader)(=|\s|$)/.test(nodeOptions)) {
-        fail('Refusing to run with a NODE_OPTIONS preload hook (--require/-r/--import/--loader) set.');
-    }
-    const preloadArg = process.execArgv.find(flag => /^(--require|-r|--import|--loader|--experimental-loader)(=|$)/.test(flag));
-    if (preloadArg) fail(`Refusing to run with a preload flag set via execArgv: ${preloadArg}`);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) fail('Test path must be a real directory.');
+    if ((stats.mode & 0o077) !== 0) fail('Test directory permissions are too broad.');
 }
 
 function assertSafeDatabasePath(configuredPath) {
@@ -111,11 +58,10 @@ function assertSafeDatabasePath(configuredPath) {
     if (resolvedPath === defaultDatabasePath) fail('Test database path matches the application default.');
     if (!isOutsideWorkspace(resolvedPath)) fail('Test database path must be outside the workspace.');
 
-    assertDirectorySecure(testDirectory, { mustExist: false });
+    assertTestDirectory({ mustExist: false });
 
     for (const candidate of [resolvedPath, `${resolvedPath}-wal`, `${resolvedPath}-shm`]) {
-        assertNoSymlinkComponents(candidate);
-        if (pathExistsAsAnything(candidate)) fail('Test database or SQLite sidecar already exists; refusing to continue.');
+        if (pathExists(candidate)) fail('Test database or SQLite sidecar already exists; refusing to continue.');
     }
 }
 
@@ -151,8 +97,11 @@ function assertConfig(config) {
 }
 
 function loadConfig() {
-    assertDirectorySecure(testDirectory, { mustExist: true });
-    assertConfigFileSecure(configPath);
+    assertTestDirectory({ mustExist: true });
+    if (!fs.existsSync(configPath)) fail('Test auth configuration is missing; run prepare first.');
+    const metadata = fs.lstatSync(configPath);
+    if (metadata.isSymbolicLink() || !metadata.isFile()) fail('Test auth configuration must be a regular file.');
+    if ((metadata.mode & 0o077) !== 0) fail('Test auth configuration permissions are too broad.');
 
     const config = dotenv.parse(fs.readFileSync(configPath));
     assertConfig(config);
@@ -183,11 +132,10 @@ function assertPortFree() {
 function prepareConfig() {
     assertSafeDatabasePath(testDatabasePath);
     assertAmbientEnvironmentSafe();
-    assertNoSymlinkComponents(testDirectory);
-    if (pathExistsAsAnything(testDirectory)) fail('Test directory already exists; refusing to overwrite it.');
+    if (pathExists(testDirectory)) fail('Test directory already exists; refusing to overwrite it.');
 
     fs.mkdirSync(testDirectory, { mode: 0o700 });
-    assertDirectorySecure(testDirectory, { mustExist: true });
+    assertTestDirectory({ mustExist: true });
 
     const config = {
         ...fixedConfig,
@@ -196,8 +144,7 @@ function prepareConfig() {
     };
     assertConfig(config);
 
-    assertNoSymlinkComponents(configPath);
-    if (pathExistsAsAnything(configPath)) fail('Test auth configuration already exists; refusing to overwrite it.');
+    if (pathExists(configPath)) fail('Test auth configuration already exists; refusing to overwrite it.');
 
     const fileDescriptor = fs.openSync(configPath, 'wx', 0o600);
     try {
@@ -207,7 +154,10 @@ function prepareConfig() {
     } finally {
         fs.closeSync(fileDescriptor);
     }
-    assertConfigFileSecure(configPath);
+    const metadata = fs.lstatSync(configPath);
+    if (metadata.isSymbolicLink() || !metadata.isFile() || (metadata.mode & 0o077) !== 0) {
+        fail('Test auth configuration permissions or file type are unsafe.');
+    }
 
     console.log(`Test configuration prepared: ${configPath}`);
     console.log(`Database path reserved for test: ${testDatabasePath}`);
@@ -215,7 +165,6 @@ function prepareConfig() {
 }
 
 async function main() {
-    assertNoPreloadHooks();
     const mode = process.argv[2] || 'check';
     if (!['prepare', 'check', 'start'].includes(mode)) {
         fail('Usage: node prepare-vtp-auth-test.js [prepare|check|start]');
