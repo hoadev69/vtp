@@ -18,7 +18,7 @@
         </div>
     </header>
     <main>
-        <section class="page-heading">
+        <section class="page-heading ui-page-header">
             <div>
                 <p class="eyebrow">THEO DÕI HOẠT ĐỘNG</p>
                 <h1>Tổng quan hệ thống</h1>
@@ -40,16 +40,16 @@
             </div>
         </section>
 
-        <nav class="view-tabs" role="tablist" aria-label="Khu vực quản trị">
-            <button id="historyTab" class="view-tab active" type="button" role="tab" aria-selected="true" aria-controls="historyPanel" data-tab-target="historyPanel">Lịch sử</button>
-            <button id="inventoryTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="inventoryPanel" data-tab-target="inventoryPanel">Kiểm kê</button>
-            <button id="ipsTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="ipsPanel" data-tab-target="ipsPanel">Địa chỉ IP</button>
-            <button id="geographyTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="geographyPanel" data-tab-target="geographyPanel">Địa bàn</button>
-            <button id="fieldsTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="formFieldsPanel" data-tab-target="formFieldsPanel">Trường nhập</button>
+        <nav class="view-tabs ui-tabs" role="tablist" aria-label="Khu vực quản trị">
+            <button id="historyTab" class="view-tab ui-tab active" type="button" role="tab" aria-selected="true" aria-controls="historyPanel" data-tab-target="historyPanel">Lịch sử</button>
+            <button id="inventoryTab" class="view-tab ui-tab" type="button" role="tab" aria-selected="false" aria-controls="inventoryPanel" data-tab-target="inventoryPanel">Kiểm kê</button>
+            <button id="ipsTab" class="view-tab ui-tab" type="button" role="tab" aria-selected="false" aria-controls="ipsPanel" data-tab-target="ipsPanel">Địa chỉ IP</button>
+            <button id="geographyTab" class="view-tab ui-tab" type="button" role="tab" aria-selected="false" aria-controls="geographyPanel" data-tab-target="geographyPanel">Địa bàn</button>
+            <button id="fieldsTab" class="view-tab ui-tab" type="button" role="tab" aria-selected="false" aria-controls="formFieldsPanel" data-tab-target="formFieldsPanel">Trường nhập</button>
         </nav>
 
         <section id="historyPanel" class="tab-panel history-section" role="tabpanel" aria-labelledby="historyTab">
-            <div class="section-heading">
+            <div class="section-heading ui-section-header">
                 <h2 id="historyTitle">Các mã đã tạo</h2>
                 <label class="search-field">
                     <span>Tìm lịch sử</span>
@@ -82,7 +82,7 @@
         </section>
 
         <section id="inventoryPanel" class="tab-panel" role="tabpanel" aria-labelledby="inventoryTab" hidden>
-            <div class="section-heading">
+            <div class="section-heading ui-section-header">
                 <div>
                     <p class="eyebrow">TÀI KHOẢN NHÂN VIÊN</p>
                     <h2>Tài khoản kiểm kê</h2>
@@ -112,7 +112,7 @@
         </section>
 
         <section id="ipsPanel" class="tab-panel ips-section" role="tabpanel" aria-labelledby="ipsTab" hidden>
-            <div class="section-heading">
+            <div class="section-heading ui-section-header">
                 <div>
                     <p class="eyebrow">NHẬN DIỆN TRÌNH DUYỆT</p>
                     <h2>Anonymous UID và các IP</h2>
@@ -137,7 +137,7 @@
                 <button id="nextAnonymousPage" type="button">Trang sau</button>
             </div>
 
-            <div class="section-heading">
+            <div class="section-heading ui-section-header">
                 <div>
                     <p class="eyebrow">KIỂM SOÁT TRUY CẬP</p>
                     <h2 id="ipsTitle">Các địa chỉ IP đã tạo mã</h2>
@@ -169,7 +169,7 @@
         </section>
 
         <section id="geographyPanel" class="tab-panel geography-section" role="tabpanel" aria-labelledby="geographyTab" hidden>
-            <div class="section-heading">
+            <div class="section-heading ui-section-header">
                 <div>
                     <p class="eyebrow">DỮ LIỆU ĐỊA BÀN</p>
                     <h2 id="geographyTitle">Thành phố và huyện</h2>
@@ -205,7 +205,7 @@
                 </table>
             </div>
 
-            <div class="section-heading commune-heading">
+            <div class="section-heading ui-section-header commune-heading">
                 <h2>Xã</h2>
             </div>
             <div class="geography-create-forms" data-edit-form-group="geography" hidden>
@@ -228,7 +228,7 @@
                 </table>
             </div>
 
-            <div class="section-heading commune-heading">
+            <div class="section-heading ui-section-header commune-heading">
                 <h2>Thôn</h2>
             </div>
             <div class="geography-create-forms" data-edit-form-group="geography" hidden>
@@ -253,7 +253,7 @@
         </section>
 
         <section id="formFieldsPanel" class="tab-panel form-fields-section" role="tabpanel" aria-labelledby="fieldsTab" hidden>
-            <div class="section-heading">
+            <div class="section-heading ui-section-header">
                 <div>
                     <p class="eyebrow">TÙY CHỈNH FORM</p>
                     <h2>Trường nhập liệu</h2>

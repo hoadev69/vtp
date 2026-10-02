@@ -16,10 +16,8 @@ body {
 .login-panel {
     width: min(100%, 390px);
     padding: 34px;
-    background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-top: 4px solid var(--color-primary);
-    box-shadow: var(--shadow-md);
 }
 
 .eyebrow {
@@ -32,31 +30,7 @@ body {
 h1 { margin: 0 0 26px; font-size: 26px; }
 
 form { display: grid; gap: 10px; }
-label { margin-top: 6px; font-size: 14px; font-weight: 700; }
-input {
-    width: 100%;
-    min-height: 42px;
-    padding: 9px 11px;
-    border: 1px solid var(--color-border-control);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    background: var(--color-surface);
-    font: inherit;
-}
-
-button {
-    min-height: 44px;
-    margin-top: 12px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: var(--color-primary);
-    color: var(--color-on-primary);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-#loginError { margin: 2px 0 0; color: var(--color-danger); font-size: var(--font-size-body-small); }
+#loginError { margin: 0; }
 
 @media (max-width: 480px) {
     .login-panel { padding: 26px 22px; }

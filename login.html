@@ -9,16 +9,16 @@
     <script src="/login.js" defer></script>
 </head>
 <body class="vtp-ui">
-    <main class="login-panel">
+    <main class="login-panel ui-surface ui-surface--elevated">
         <p class="eyebrow">VTP · KHU VỰC QUẢN TRỊ</p>
         <h1>Đăng nhập</h1>
         <form id="loginForm">
-            <label for="username">Tên đăng nhập</label>
-            <input id="username" name="username" autocomplete="username" required>
-            <label for="password">Mật khẩu</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" required>
-            <button type="submit">Đăng nhập</button>
-            <p id="loginError" role="alert" hidden></p>
+            <label class="ui-label" for="username">Tên đăng nhập</label>
+            <input id="username" name="username" class="ui-input" autocomplete="username" required>
+            <label class="ui-label" for="password">Mật khẩu</label>
+            <input id="password" name="password" class="ui-input" type="password" autocomplete="current-password" required>
+            <button class="ui-button ui-button--primary" type="submit">Đăng nhập</button>
+            <p id="loginError" class="ui-alert ui-alert--danger" role="alert" hidden></p>
         </form>
     </main>
 </body>

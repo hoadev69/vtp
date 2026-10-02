@@ -91,7 +91,7 @@ h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 700; }
 }
 .view-tab:hover { color: var(--ink); }
 .view-tab.active { color: var(--green-dark); }
-.view-tab.active::after {
+.vtp-ui .view-tab.active::after {
     position: absolute;
     right: 0;
     bottom: -1px;
@@ -243,14 +243,14 @@ button:disabled { cursor: default; opacity: .45; }
 @media (max-width: 760px) {
     .topbar { padding: 0 4vw; }
     main { width: 92vw; }
-    .page-heading { align-items: start; flex-direction: column; gap: 17px; padding-top: 24px; }
+    .vtp-ui .page-heading { align-items: start; flex-direction: column; gap: 17px; padding-top: 24px; }
     h1 { font-size: 23px; }
     .overview-metrics { width: 100%; }
     .overview-metrics > div { flex: 1; min-width: 0; padding: 1px 11px; }
     .overview-metrics > div:first-child { padding-left: 0; border-left: 0; }
     .overview-metrics strong { font-size: 19px; }
     .view-tabs { gap: 21px; }
-    .section-heading { align-items: stretch; flex-direction: column; }
+    .vtp-ui .section-heading { align-items: stretch; flex-direction: column; }
     .edit-toolbar { justify-content: flex-start; }
     .search-field { width: 100%; }
     .geography-form { align-items: stretch; flex-direction: column; }
