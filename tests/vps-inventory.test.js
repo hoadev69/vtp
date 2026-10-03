@@ -98,7 +98,7 @@ if [ "$1" = show ]; then
     Group) printf '%s' "$VTP_FAKE_SERVICE_GROUP" ;;
     WorkingDirectory) printf '%s' "$VTP_FAKE_APP_ROOT" ;;
     ExecStart) printf '/usr/bin/env node --token=EXECSTART_SECRET %s/current/server.js' "$VTP_FAKE_APP_ROOT" ;;
-    EnvironmentFiles) printf '[]' ;;
+    EnvironmentFiles) printf '%s' "\${VTP_FAKE_ENVIRONMENT_FILES:-[]}" ;;
     Environment) printf '%s' "$VTP_FAKE_ENVIRONMENT" ;;
     *) exit 2 ;;
   esac
@@ -163,6 +163,19 @@ if [ "$1" = --version ]; then printf 10.8.2; else printf attempted > "$VTP_MUTAT
         assert.doesNotMatch(readOnly.stdout, /PORT=9999|\/tmp\/secret-path/);
         assert.doesNotMatch(readOnly.stdout, /EXECSTART_SECRET/);
         assert.match(readOnly.stdout, /proxy_pass \[upstream credentials redacted\]/);
+        assert.equal(fs.existsSync(mutationMarker), false);
+        assert.deepEqual(snapshotTree(appRoot), before);
+
+        const supportedEnvironmentFile = invoke('--check', {
+            VTP_FAKE_ENVIRONMENT_FILES: `${appRoot}/.env (ignore_errors=no)`,
+        });
+        assert.match(supportedEnvironmentFile.stdout, /PASS\s+EnvironmentFile: only the supported app-root \.env source is configured/);
+
+        const unknownEnvironmentFile = invoke('--check', {
+            VTP_FAKE_ENVIRONMENT_FILES: '/etc/vtp/secrets.env (ignore_errors=no)',
+        });
+        assert.notEqual(unknownEnvironmentFile.status, 0);
+        assert.match(unknownEnvironmentFile.stdout, /FAIL\s+EnvironmentFile: only the app-root \.env source is supported/);
         assert.equal(fs.existsSync(mutationMarker), false);
         assert.deepEqual(snapshotTree(appRoot), before);
 

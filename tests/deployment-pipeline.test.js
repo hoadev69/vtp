@@ -17,8 +17,8 @@ test('release activation and rollback preserve active releases and SQLite', () =
     const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'vtp-deployment-pipeline-'));
     const appRoot = path.join(temporaryRoot, 'app');
     const tools = path.join(temporaryRoot, 'tools');
-    const releaseIds = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((letter, index) => `${letter.repeat(40)}-${index + 1}`);
-    const [previousId, healthyId, healthFailureId, restartFailureId, permissionFailureId, noDatabasePathId, noUserId, dependencyFailureId, unsafePermissionId] = releaseIds;
+    const releaseIds = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((letter, index) => `${letter.repeat(40)}-${index + 1}`);
+    const [previousId, healthyId, healthFailureId, restartFailureId, permissionFailureId, noDatabasePathId, noUserId, dependencyFailureId, unsafePermissionId, frontendFailureId] = releaseIds;
     const databasePath = path.join(appRoot, 'data', 'history.sqlite');
     let liveDatabase;
 
@@ -80,7 +80,11 @@ exec "$@"
 `);
         writeExecutable(path.join(tools, 'curl'), `#!/bin/sh
 current=$(basename "$(readlink -f "$VTP_FAKE_APP_ROOT/current")")
-test "$current" != "$VTP_FAIL_HEALTH_RELEASE"
+for argument do url=$argument; done
+case "$url" in
+  */) test "$current" != "$VTP_FAIL_FRONTEND_RELEASE" ;;
+  *) test "$current" != "$VTP_FAIL_HEALTH_RELEASE" ;;
+esac
 `);
         writeExecutable(path.join(tools, 'npm'), `#!/bin/sh
       if [ "$VTP_FAIL_NPM_INSTALL" = 1 ]; then exit 1; fi
@@ -186,6 +190,12 @@ test "$current" != "$VTP_FAIL_HEALTH_RELEASE"
         assert.equal(fs.realpathSync(path.join(appRoot, 'current')), path.join(appRoot, 'releases', healthyId));
         assert.ok(fs.existsSync(path.join(appRoot, 'releases', healthFailureId)));
 
+        prepareStage(frontendFailureId);
+        const frontendFailure = invoke('deploy', frontendFailureId, { VTP_FAIL_FRONTEND_RELEASE: frontendFailureId });
+        assert.notEqual(frontendFailure.status, 0);
+        assert.equal(fs.realpathSync(path.join(appRoot, 'current')), path.join(appRoot, 'releases', healthyId));
+        assert.ok(fs.existsSync(path.join(appRoot, 'releases', frontendFailureId)));
+
         prepareStage(restartFailureId);
         const restartFailure = invoke('deploy', restartFailureId, { VTP_FAIL_RESTART_RELEASE: restartFailureId });
         assert.notEqual(restartFailure.status, 0);
@@ -196,7 +206,7 @@ test "$current" != "$VTP_FAIL_HEALTH_RELEASE"
         assert.equal(manualRollback.status, 0, manualRollback.stderr || manualRollback.stdout);
         assert.equal(fs.realpathSync(path.join(appRoot, 'current')), previousRelease);
         assert.ok(fs.existsSync(path.join(appRoot, 'releases', healthyId)));
-        assert.equal(countBackups(path.join(appRoot, 'backups')), 3);
+        assert.equal(countBackups(path.join(appRoot, 'backups')), 4);
 
         assert.deepEqual(liveDatabase.prepare('SELECT value FROM deployment_probe ORDER BY rowid').all(), [
             { value: 'preserve-me' },

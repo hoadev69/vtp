@@ -51,7 +51,7 @@ The single `current` symlink couples Nginx's static root and Express's entry poi
 - `vtp` has `WorkingDirectory=/var/www/vtp` (so dotenv continues reading the root `.env`) and an `ExecStart` that invokes `/var/www/vtp/current/server.js`.
 - The SSH deploy user can write the app root/release directories and already has the same restart permission assumed by the existing workflow. No additional sudo command or permission is introduced.
 - `/var/www/vtp/data` and the actual configured SQLite database already exist. Each release links `data/` to this persistent directory; database files are never shipped, replaced, or migrated by this pipeline.
-- The helper resolves `DATABASE_PATH` from explicit systemd `Environment`, then `/var/www/vtp/.env`, then the existing default `/var/www/vtp/data/history.sqlite`. It refuses units with `EnvironmentFile` because that source cannot be verified from this repository; reconcile the real environment source before enabling deployment.
+- At Phase 10.2, the helper rejected units with `EnvironmentFile` because that source had not been verified. After the later VPS inventory, a follow-up narrowly allowlisted only `/var/www/vtp/.env`; all other EnvironmentFile sources remain rejected. `DATABASE_PATH` must now be explicit in systemd `Environment` and point to the existing persistent DB.
 - Node.js/npm and the native build prerequisites for `better-sqlite3` are available on the VPS. The package install occurs before the active symlink changes.
 
 The deploy user must also be able to run the existing systemd restart command non-interactively, as the former workflow already required. The workflow does not modify the unit, grant sudo rights, change DNS/Cloudflare, or configure TLS.

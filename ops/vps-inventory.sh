@@ -308,11 +308,21 @@ if [[ "$exec_entrypoint" == yes ]]; then
 else
     record_check FAIL 'ExecStart' 'must reference current/server.js'
 fi
-if [[ -z "$unit_environment_files" || "$unit_environment_files" == '[]' ]]; then
-    record_check PASS 'EnvironmentFile' 'none; runtime values are checked from Environment'
-else
-    record_check FAIL 'EnvironmentFile' 'unsupported by the deployment helper; reconcile before deploy'
-fi
+case "$unit_environment_files" in
+    ''|'[]')
+        record_check PASS 'EnvironmentFile' 'none; runtime values are checked from Environment'
+        ;;
+    "$app_root/.env (ignore_errors=no)")
+        if [[ -f "$app_root/.env" && ! -L "$app_root/.env" ]]; then
+            record_check PASS 'EnvironmentFile' 'only the supported app-root .env source is configured'
+        else
+            record_check FAIL 'EnvironmentFile' 'the supported app-root .env source must be a regular non-symlink file'
+        fi
+        ;;
+    *)
+        record_check FAIL 'EnvironmentFile' 'only the app-root .env source is supported by the deployment helper'
+        ;;
+esac
 if [[ "$node_env" == production && "$port" == 3001 ]]; then
     record_check PASS 'runtime environment' 'NODE_ENV=production and PORT=3001'
 else

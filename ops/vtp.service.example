@@ -11,6 +11,7 @@ Environment=NODE_ENV=production
 Environment=PORT=3001
 Environment=DATABASE_PATH=/var/www/vtp/data/history.sqlite
 Environment=TRUST_PROXY_HOPS=0
+EnvironmentFile=/var/www/vtp/.env
 ExecStart=/usr/bin/env node /var/www/vtp/current/server.js
 Restart=on-failure
 RestartSec=3

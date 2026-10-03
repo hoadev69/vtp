@@ -10,6 +10,7 @@ sudo_bin=${SUDO_BIN:-sudo}
 curl_bin=${CURL_BIN:-curl}
 npm_bin=${NPM_BIN:-npm}
 health_url=${VTP_HEALTH_URL:-http://127.0.0.1:3001/healthz}
+frontend_url=${VTP_FRONTEND_URL:-http://127.0.0.1:3001/}
 health_retries=${VTP_HEALTH_RETRIES:-15}
 health_interval=${VTP_HEALTH_INTERVAL:-2}
 service_user=''
@@ -60,8 +61,14 @@ require_service_layout() {
     [[ -n "$service_user" && "$service_user" != root ]] \
         || die "systemd must specify a non-root User; refusing release switch."
     [[ -n "$service_group" ]] || die "systemd must specify a Group; refusing release switch."
-    [[ -z "$environment_files" || "$environment_files" == '[]' ]] \
-        || die "EnvironmentFile is not supported by this preflight; set runtime values in explicit unit Environment and keep credentials in $app_root/.env."
+    case "$environment_files" in
+        ''|'[]') ;;
+        "$app_root/.env (ignore_errors=no)")
+            [[ -f "$app_root/.env" && ! -L "$app_root/.env" ]] \
+                || die "The required systemd EnvironmentFile must be a regular $app_root/.env file."
+            ;;
+        *) die "Only EnvironmentFile=$app_root/.env is supported; refusing an unknown environment source." ;;
+    esac
     service_database_path=$(unit_environment_value DATABASE_PATH)
     [[ "$service_database_path" == /* ]] \
         || die "systemd must declare an absolute DATABASE_PATH; refusing to guess the SQLite location."
@@ -161,7 +168,8 @@ wait_for_health() {
     local attempt
     for ((attempt = 1; attempt <= health_retries; attempt += 1)); do
         if "$systemctl_bin" is-active --quiet "$service_name" \
-            && "$curl_bin" --fail --silent --output /dev/null --max-time 3 "$health_url"; then
+            && "$curl_bin" --fail --silent --output /dev/null --max-time 3 "$health_url" \
+            && "$curl_bin" --fail --silent --output /dev/null --max-time 3 "$frontend_url"; then
             return 0
         fi
         if (( attempt < health_retries )); then

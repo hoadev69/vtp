@@ -74,7 +74,7 @@ for f in /var/www/vtp/data/history.sqlite-wal /var/www/vtp/data/history.sqlite-s
 done
 ```
 
-Xác nhận `DATABASE_PATH` thực tế từ systemd `Environment` (chỉ in key đó) và so với `.env` nếu file có khai báo. Phase 10.3 helper yêu cầu một đường dẫn tuyệt đối, hiện hữu, được khai báo rõ trong `Environment`; nó từ chối `EnvironmentFile`, không tự suy đoán fallback. Đường dẫn phải nằm ngoài `releases/`.
+Xác nhận `DATABASE_PATH` thực tế từ systemd `Environment` (chỉ in key đó) và so với `.env` nếu file có khai báo. Helper yêu cầu đường dẫn tuyệt đối, hiện hữu, được khai báo rõ trong `Environment`; nếu dùng EnvironmentFile, chỉ chấp nhận đúng `/var/www/vtp/.env`. Các giá trị `NODE_ENV`, `PORT` hoặc `DATABASE_PATH` khai báo trong `.env` phải nhất quán với lần lượt `production`, `3001` và `/var/www/vtp/data/history.sqlite`, vì EnvironmentFile có thể ghi đè các giá trị `Environment=` khi systemd khởi chạy process. Đường dẫn DB phải nằm ngoài `releases/`.
 
 Xác nhận Nginx worker user qua cấu hình đang dùng và trạng thái process. Đối chiếu document root, `server_name`, TLS termination, proxy chain, headers `/api/` và `/healthz`; không dùng Nginx mẫu thay cho việc kiểm kê cấu hình hoạt động.
 
@@ -90,6 +90,28 @@ Inventory read-only đã chạy trên host. Các giá trị secret không đư�
 - `.env` tồn tại ở `/var/www/vtp/.env`, owner `deploy:deploy`, mode `0600`. Chỉ giữ nguyên; systemd hiện đọc file này và ứng dụng cũng dùng dotenv với `WorkingDirectory` hiện tại.
 - Nginx VTP đang cấu hình domain `vtp.biloveg.io.vn`, TLS certificate/key tại `/etc/nginx/ssl/vtp/origin.pem` và `origin.key`, proxy toàn bộ `/` tới `127.0.0.1:3001`. Config TLS/domain đúng host; routing chưa phù hợp với release architecture sẽ serve `current/frontend/dist` tĩnh.
 - Listener `*:3001` là VTP; listener `0.0.0.0:3000` là process Node khác, thuộc ứng dụng cần giữ nguyên (được xác định là IM theo thông tin vận hành). VTP hiện bind wildcard thay vì loopback; target production code phải bind `127.0.0.1:3001`. Deploy user `deploy` có NOPASSWD restart quyền `systemctl restart vtp`, và sở hữu app root.
+
+### Kiểm tra lại sau lần deploy bị chặn (2026-10-03)
+
+Một inventory chỉ đọc bổ sung xác nhận trạng thái hiện tại sau lần upload thất bại:
+
+- VPS đang chạy Node.js `v22.23.3` và npm `10.9.9`; inventory gate của repo yêu cầu Node.js 24, nên cần quyết định rõ phiên bản runtime trước deploy.
+- `current`, `releases/`, và `backups/` vẫn chưa tồn tại. Artifact `7e2e26f94498b2af8d84773b0d3928d82b159586` còn nguyên trong `incoming/` và một bản giải nén còn trong `staging/`; không xóa hoặc ghi đè chúng trong bước bootstrap.
+- Cây live có các trang HTML/CSS/JS cũ ở app root nhưng không có `frontend/dist`. Bản staging đang giữ có `frontend/dist`, song package không chứa các HTML legacy ở app root; server trong artifact cũ vẫn có route `sendFile(__dirname/index.html)`.
+- Nginx đang proxy toàn bộ VTP tới Express, không phục vụ `current/frontend/dist`. Source workspace đã được cập nhật để bản build mới phục vụ React entry/assets từ từng release qua Express; helper cũng kiểm tra `/` trước khi coi release khỏe. Artifact cũ đang ở `incoming/`/`staging/` chưa có thay đổi này và không được deploy lại.
+- Mẫu Nginx dùng static assets với named `@app` fallback. Khi candidate có assets, Nginx phục vụ trực tiếp; khi rollback về snapshot legacy thiếu `frontend/dist`, request UI được proxy lại về Express cũ. Live Nginx chưa được chỉnh.
+- `DATABASE_PATH` vẫn chưa được khai báo trong systemd; app hiện dùng default `/var/www/vtp/data/history.sqlite`. DB/WAL/SHM vẫn là `0644`, thư mục data là `0775`. Chưa đổi quyền hoặc đọc nội dung database.
+
+### Đã chuẩn bị rollback baseline (2026-10-03)
+
+Sau inventory bổ sung, các bước chuẩn bị an toàn sau đã được áp dụng trên VPS:
+
+- Tạo online SQLite backup qua `better-sqlite3` Backup API, kiểm tra `integrity_check` và `foreign_key_check`: `/var/www/vtp/backups/history-precutover-20261003T064740Z.sqlite`, owner `deploy:deploy`, mode `0600`.
+- Snapshot code/assets legacy từ app đang chạy thành `/var/www/vtp/releases/baseline-live-20261003-1`; `current` trỏ tới baseline này. Snapshot không chứa `.env` hoặc DB; `data/` trỏ về DB persistent và `node_modules` trỏ về bộ dependencies live.
+- Đặt `/var/www/vtp/data` mode `0700`, DB và sidecars hiện hữu mode `0600`; owner vẫn `deploy:deploy`.
+- Cài `/etc/systemd/system/vtp.service.d/95-vtp-release-helper.conf` với `.env` được giữ lại, runtime values tường minh và ExecStart tới `current/server.js`; `daemon-reload` đã chạy.
+
+**Không restart VTP, không reload Nginx, không xóa/sửa archive hoặc staging, không thay đổi IM.** Service vẫn active bằng process cũ; cấu hình ExecStart mới sẽ được dùng ở lần restart kế tiếp. Source workspace có fix UI/health mới nhưng chưa được đóng gói vào artifact đang nằm trong `incoming/`/`staging/`. Cần đưa source đã sửa lên `main` qua quy trình được duyệt để tạo artifact mới; không deploy artifact cũ.
 
 **Kết luận:** port/domain và dự đoán DB path đã khớp mục tiêu, nhưng deployment chưa sẵn sàng: thiếu baseline release/current, unit còn `EnvironmentFile`/`npm start`/thiếu `Group=`, Nginx chưa serve React release, và SQLite mode chưa đạt gate. Chưa có lệnh nào ở dưới được chạy.
 
@@ -137,7 +159,7 @@ Yêu cầu helper/unit mẫu:
 - `ExecStart` gọi `/var/www/vtp/current/server.js`.
 - `User`/`Group` non-root tường minh.
 - `Environment=NODE_ENV=production`, `Environment=PORT=3001` và `Environment=DATABASE_PATH=/var/www/vtp/data/history.sqlite` tường minh. DB phải thực sự nằm tại path này; nếu inventory cho thấy path khác, dừng và lập kế hoạch bảo toàn dữ liệu riêng, không tự di chuyển.
-- Không khai báo `EnvironmentFile` với helper hiện tại. Credentials ứng dụng để trong `.env` an toàn; không đưa secrets vào systemd output, workflow artifact hoặc log.
+- Chỉ dùng `EnvironmentFile=/var/www/vtp/.env` nếu cần; helper từ chối mọi path EnvironmentFile khác. Credentials ứng dụng để trong `.env` an toàn; không đưa secrets vào systemd output, workflow artifact hoặc log. Giá trị runtime trong `.env` phải nhất quán với các gate tường minh của unit.
 - VTP bind `127.0.0.1:3001` để không đụng ứng dụng IM trên cổng `3000`; `ReadWritePaths` chỉ mở persistent DB directory cho service. Unit mẫu dùng `Restart=on-failure` và hardening cơ bản.
 - Node executable phải được xác minh trên host. Unit mẫu dùng `/usr/bin/env node`; kiểm tra systemd `PATH` thực tế, hoặc thay bằng absolute path tìm thấy trên VPS.
 - Không cấp thêm sudo cho workflow. Tài khoản hiện có phải qua được `sudo -n -l <systemctl-path> restart vtp`; deploy helper kiểm tra quyền này trước khi cài candidate.
@@ -193,7 +215,7 @@ Lệnh này không xóa/di chuyển hay ghi nội dung SQLite/WAL/SHM. Chạy tr
 
 Baseline release phải được tạo từ đúng code đang chạy, đặt trong `releases/<40-hex-sha>-<run-id>`, có dependencies phù hợp, và chứa symlink `data -> /var/www/vtp/data`. **Không thể suy ra source baseline từ repo hoặc địa chỉ VPS**; lấy source/commit từ inventory và operator xác nhận trước khi copy. Không ghi đè thư mục release, `.env`, DB, WAL/SHM hay `current`; chỉ tạo `current` khi baseline hoàn chỉnh và đã có backup.
 
-Sau khi baseline tồn tại, `systemctl edit vtp` tạo drop-in cho đúng service hiện tại. `EnvironmentFile=` reset nguồn cũ; giữ nguyên `.env` tại app root vì `server.js` nạp dotenv với `WorkingDirectory=/var/www/vtp`. Credentials không bị copy vào unit; các biến app khác phải tiếp tục có trong `.env`:
+Sau khi baseline tồn tại, tạo drop-in cho đúng service hiện tại. Reset rồi khai báo lại duy nhất `EnvironmentFile=/var/www/vtp/.env`; credentials vẫn giữ trong `.env` tại app root và không bị copy vào unit. Helper xác nhận file regular/private, đồng thời tiếp tục đòi runtime keys tường minh trong `Environment`:
 
 ```ini
 [Service]
@@ -201,12 +223,34 @@ WorkingDirectory=/var/www/vtp
 User=deploy
 Group=deploy
 EnvironmentFile=
+EnvironmentFile=/var/www/vtp/.env
 ExecStart=
 ExecStart=/usr/bin/env node /var/www/vtp/current/server.js
 Environment=NODE_ENV=production
 Environment=PORT=3001
 Environment=DATABASE_PATH=/var/www/vtp/data/history.sqlite
 ```
+
+Áp dụng drop-in bằng `systemctl edit vtp`; không thay unit chính hoặc `.env`:
+
+```sh
+sudo systemctl edit --drop-in=95-vtp-release-helper.conf --stdin vtp <<'EOF'
+[Service]
+WorkingDirectory=/var/www/vtp
+User=deploy
+Group=deploy
+EnvironmentFile=
+EnvironmentFile=/var/www/vtp/.env
+ExecStart=
+ExecStart=/usr/bin/env node /var/www/vtp/current/server.js
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=DATABASE_PATH=/var/www/vtp/data/history.sqlite
+EOF
+sudo systemctl daemon-reload
+```
+
+Nếu drop-in `95-vtp-release-helper.conf` đã tồn tại, dừng và xem xét nội dung trước khi sửa; không ghi đè cấu hình khác.
 
 Xác minh unit candidate và sau khi được duyệt mới áp dụng/restart VTP:
 

@@ -26,7 +26,7 @@ Result: **Repository-side readiness checks and isolated deployment simulations p
 Before a deploy or rollback can change `current`, the helper now verifies:
 
 - The service has explicit non-root `User` and `Group`, `WorkingDirectory=/var/www/vtp`, and `ExecStart` referencing `/var/www/vtp/current/server.js`.
-- The service has no `EnvironmentFile`; runtime values must be explicit in systemd `Environment`, while credentials remain in a private root `.env` readable by the service identity. This avoids logging or parsing app secrets in the deploy helper.
+- At Phase 10.3, the helper rejected all `EnvironmentFile` sources. A later follow-up, after live inventory, permits only the exact app-root `/var/www/vtp/.env`; runtime gates remain explicit in systemd `Environment`, and the file must remain private and regular.
 - `NODE_ENV=production`, `PORT=3000`, and an absolute `DATABASE_PATH` are explicitly configured. The database file must already exist outside staging/releases.
 - Existing DB parent, DB, and present `-wal`/`-shm` files match the configured service user/group and have owner permissions needed for SQLite. Group-read is allowed for a backup reader, but group-write and `other` access are rejected. The backup directory is a private `0700` directory owned/writable by the deploy user.
 - The existing non-interactive sudo rule authorizes exactly the service restart before any activation. Production dependencies must install and resolve before backup/switch.
@@ -58,7 +58,7 @@ The following cannot be established from this repository or dev container:
 - Whether `/var/www/vtp` exists, whether `current`/`releases`/`data`/`backups` have the proposed layout, and who owns them.
 - The real SQLite path, DB owner/group/mode, WAL/SHM state, backup storage capacity, and whether the GitHub deploy account can read an online WAL backup.
 - The active Nginx document root, configuration, TLS terminator, public host, external proxy chain, and resulting Secure-cookie behavior.
-- Whether the current service uses `EnvironmentFile`; the helper will deliberately refuse deployment if it does.
+- Whether the current service uses an EnvironmentFile source other than the exact app-root `.env`; such unknown sources remain a deployment blocker.
 - Whether the existing GitHub Secrets are present/valid, whether the deploy user has required filesystem access, and whether its current sudo rule passes the helper's non-interactive preflight.
 - Whether a healthy baseline release/current symlink exists. The helper refuses first activation without a retained release; one-time bootstrap/cutover needs a separately reviewed maintenance plan.
 

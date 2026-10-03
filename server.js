@@ -386,6 +386,58 @@ function parseFieldValues(value) {
     }
 }
 
+const frontendDistPath = path.join(__dirname, 'frontend', 'dist');
+const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+app.use(express.static(frontendDistPath, { index: false }));
+
+function sendFrontendApp(req, res, next) {
+    const entrypoint = process.env.NODE_ENV === 'production'
+        ? frontendIndexPath
+        : path.join(__dirname, 'index.html');
+    res.sendFile(entrypoint, error => {
+        if (error) next(error);
+    });
+}
+
+app.get('/login', (req, res) => res.redirect('/admin'));
+
+app.get(['/', '/index.html'], blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
+    sendFrontendApp(req, res, error => {
+        if (error) res.status(error.statusCode || 500).end();
+    });
+});
+
+app.get('/ketqua.html', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
+    sendFrontendApp(req, res, error => {
+        if (error) res.status(error.statusCode || 500).end();
+    });
+});
+
+app.get('/admin', (req, res) => {
+    if (process.env.NODE_ENV === 'production') return sendFrontendApp(req, res, () => res.sendStatus(500));
+    logSessionDebug(req, '/admin');
+    const user = getAuthenticatedUser(req);
+    if (!user) return res.status(401).sendFile(path.join(__dirname, 'admin.html'));
+    if (user.role !== 'admin') return res.status(403).type('text').send('Không có quyền truy cập.');
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+app.get('/kiemke', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
+    sendFrontendApp(req, res, error => {
+        if (error) res.status(error.statusCode || 500).end();
+    });
+});
+
+if (process.env.NODE_ENV !== 'production') {
+    app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/admin.js', '/navigation.js', '/a7.svg'], (req, res) => {
+        res.sendFile(path.join(__dirname, req.path.slice(1)));
+    });
+
+    app.get(['/kiemke.css', '/kiemke.js'], (req, res) => {
+        res.sendFile(path.join(__dirname, req.path.slice(1)));
+    });
+}
+
 app.use((req, res, next) => {
     if (process.env.NODE_ENV !== 'production'
         || req.path === '/healthz'
@@ -394,36 +446,6 @@ app.use((req, res, next) => {
         return next();
     }
     res.sendStatus(404);
-});
-
-app.get('/login', (req, res) => res.redirect('/admin'));
-
-app.get(['/', '/index.html'], blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/ketqua.html', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
-    res.sendFile(path.join(__dirname, 'ketqua.html'));
-});
-
-app.get('/admin', (req, res) => {
-    logSessionDebug(req, '/admin');
-    const user = getAuthenticatedUser(req);
-    if (!user) return res.status(401).sendFile(path.join(__dirname, 'admin.html'));
-    if (user.role !== 'admin') return res.status(403).type('text').send('Không có quyền truy cập.');
-    res.sendFile(path.join(__dirname, 'admin.html'));
-});
-
-app.get(['/home.css', '/ketqua.css', '/login.css', '/admin.css', '/login.js', '/admin.js', '/navigation.js', '/a7.svg'], (req, res) => {
-    res.sendFile(path.join(__dirname, req.path.slice(1)));
-});
-
-app.get('/kiemke', blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
-    res.sendFile(path.join(__dirname, 'kiemke.html'));
-});
-
-app.get(['/kiemke.css', '/kiemke.js'], (req, res) => {
-    res.sendFile(path.join(__dirname, req.path.slice(1)));
 });
 
 app.post('/api/login', loginRateLimit, async (req, res) => {
