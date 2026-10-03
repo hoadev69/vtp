@@ -111,6 +111,12 @@
     transform: translate(-50%, -1px);
 }
 
+@media (max-width: 760px) {
+    .inventory-page__create {
+        bottom: calc(100px + env(safe-area-inset-bottom) + var(--vtp-keyboard-inset, 0px));
+    }
+}
+
 .inventory-page__state {
     margin: var(--space-8) 0 0;
     color: var(--color-text-secondary);
