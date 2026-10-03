@@ -1,5 +1,11 @@
 node_modules/
 npm-debug.log*
+# Local environment files; keep only sanitized examples in Git.
 .env
-data/*.sqlite*
+.env.*
+!.env.example
+!.env.*.example
+data/
 frontend/dist/
+# Personal VS Code workspace settings.
+.vscode/settings.json
