@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/client.js';
 import InputControl from '../../shared/components/InputControl.jsx';
-import { handleAdminAuthorizationError } from './adminManagementUtils.js';
+import { getAdminErrorMessage, handleAdminAuthorizationError } from './adminManagementUtils.js';
 
 export default function AccountManagement({ currentUser, onSessionExpired }) {
     const [accounts, setAccounts] = useState(null);
@@ -26,7 +26,8 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
             .then(result => { if (current) setAccounts(result); })
             .catch(requestError => {
                 if (!current) return;
-                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể tải danh sách tài khoản.');
+                setAccounts(null);
+                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể tải danh sách tài khoản.'));
             })
             .finally(() => { if (current) setLoading(false); });
         return () => { current = false; };
@@ -53,7 +54,7 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
             setPage(1);
             setReload(value => value + 1);
         } catch (requestError) {
-            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể tạo tài khoản.');
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể tạo tài khoản.'));
         } finally {
             setBusyId(null);
         }
@@ -68,7 +69,7 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
             setMessage(successMessage);
             setReload(value => value + 1);
         } catch (requestError) {
-            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể cập nhật tài khoản.');
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể cập nhật tài khoản.'));
         } finally {
             setBusyId(null);
         }
@@ -104,7 +105,7 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
             form.reset();
             setMessage(`Đã đặt lại mật khẩu cho ${account.username}.`);
         } catch (requestError) {
-            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể đặt lại mật khẩu.');
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể đặt lại mật khẩu.'));
         } finally {
             setBusyId(null);
         }

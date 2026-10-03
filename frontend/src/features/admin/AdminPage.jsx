@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { apiRequest } from '../../shared/api/client.js';
 import AdminDashboard from './AdminDashboard.jsx';
 import AdminLoginForm from './AdminLoginForm.jsx';
+import { getAdminErrorMessage } from './adminManagementUtils.js';
 
 function publishAuthChange(role, username = '') {
     window.dispatchEvent(new CustomEvent('vtp:authchange', {
@@ -13,8 +14,13 @@ export default function AdminPage({ authUser, authStatus, onRetryAuth }) {
     const [authError, setAuthError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loginForbidden, setLoginForbidden] = useState(false);
+    const loginInFlight = useRef(false);
+    const authFailureHandled = useRef(false);
 
     async function login(credentials) {
+        if (loginInFlight.current) return;
+        loginInFlight.current = true;
+        authFailureHandled.current = false;
         setIsSubmitting(true);
         setAuthError('');
         setLoginForbidden(false);
@@ -24,20 +30,29 @@ export default function AdminPage({ authUser, authStatus, onRetryAuth }) {
             publishAuthChange('admin', user.username);
         } catch (error) {
             if (error?.status === 403) setLoginForbidden(true);
-            else setAuthError(error.message || 'Đăng nhập thất bại.');
+            else setAuthError(getAdminErrorMessage(error, 'Đăng nhập thất bại.'));
         } finally {
+            loginInFlight.current = false;
             setIsSubmitting(false);
         }
     }
 
-    function handleSessionExpired() {
+    const handleSessionExpired = useCallback(status => {
+        if (authFailureHandled.current) return;
+        authFailureHandled.current = true;
+        if (status === 'forbidden') {
+            setLoginForbidden(true);
+            onRetryAuth();
+            return;
+        }
+        setLoginForbidden(false);
         publishAuthChange(null);
-    }
+    }, [onRetryAuth]);
 
     const view = authStatus === 'checking' ? 'checking'
         : authStatus === 'error' ? 'error'
-            : authUser?.role === 'admin' ? 'dashboard'
-                : authUser?.role === 'operator' || loginForbidden ? 'forbidden' : 'login';
+            : authUser?.role === 'operator' || loginForbidden ? 'forbidden'
+                : authUser?.role === 'admin' ? 'dashboard' : 'login';
     let content;
     if (view === 'checking') content = <p className="admin-list-state" role="status">Đang xác minh phiên quản trị...</p>;
     else if (view === 'login') content = <AdminLoginForm error={authError} isSubmitting={isSubmitting} onLogin={login} />;

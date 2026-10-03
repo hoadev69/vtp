@@ -1,6 +1,6 @@
 import React from 'react';
-import { useEffect, useState } from 'react';
-import { apiRequest } from '../../shared/api/client.js';
+import { useEffect, useRef, useState } from 'react';
+import { ApiError, apiRequest } from '../../shared/api/client.js';
 import { useAppNavigation } from '../../shared/NavigationContext.jsx';
 import OrderForm from './OrderForm.jsx';
 
@@ -34,6 +34,7 @@ export default function PublicOrderPage() {
     const [configurationError, setConfigurationError] = useState('');
     const [configurationAttempt, setConfigurationAttempt] = useState(0);
     const [submitError, setSubmitError] = useState('');
+    const submitLock = useRef(false);
 
     useEffect(() => {
         let isCurrent = true;
@@ -83,6 +84,13 @@ export default function PublicOrderPage() {
 
     async function handleSubmit(event) {
         event.preventDefault();
+        if (submitLock.current) return;
+        const normalizedBarcode = barcode.trim();
+        if (!normalizedBarcode) {
+            setSubmitError('Vui lòng nhập mã vận đơn hợp lệ.');
+            return;
+        }
+        submitLock.current = true;
         setSubmitError('');
         setIsSubmitting(true);
 
@@ -90,7 +98,7 @@ export default function PublicOrderPage() {
         const selectedCommune = selectedDistrict?.communes?.find(item => item.name === communeName);
         const hasVillage = (selectedCommune?.villages?.length || 0) > 0;
         const payload = {
-            barcode,
+            barcode: normalizedBarcode,
             chonHuyen: districtName,
             chonXa: communeName,
             chonThon: hasVillage ? villageName : '',
@@ -107,8 +115,13 @@ export default function PublicOrderPage() {
             Object.entries(result?.fields || {}).forEach(([key, value]) => query.set(key, value));
             navigate(`/ketqua.html?${query}`);
         } catch (error) {
-            setSubmitError(error.message || 'Không thể lưu lịch sử tạo mã.');
+            if (error instanceof ApiError && error.status === 409 && error.data?.code === 'BARCODE_ALREADY_EXISTS') {
+                setSubmitError('Mã vận đơn này đã được sử dụng. Vui lòng kiểm tra lại mã.');
+            } else {
+                setSubmitError(error.message || 'Không thể lưu lịch sử tạo mã.');
+            }
         } finally {
+            submitLock.current = false;
             setIsSubmitting(false);
         }
     }

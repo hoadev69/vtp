@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/client.js';
 import InputControl from '../../shared/components/InputControl.jsx';
-import { handleAdminAuthorizationError } from './adminManagementUtils.js';
+import { getAdminErrorMessage, handleAdminAuthorizationError } from './adminManagementUtils.js';
 
 function formatDate(value) {
     if (!value) return '—';
@@ -31,7 +31,9 @@ export default function IpManagement({ onSessionExpired }) {
             })
             .catch(requestError => {
                 if (!current) return;
-                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể tải danh sách IP.');
+                setIps(null);
+                setDrafts({});
+                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể tải danh sách IP.'));
             })
             .finally(() => { if (current) setLoading(false); });
         return () => { current = false; };
@@ -50,7 +52,7 @@ export default function IpManagement({ onSessionExpired }) {
             setMessage(blocked !== Boolean(entry.blocked) ? (blocked ? 'Đã chặn IP.' : 'Đã bỏ chặn IP.') : 'Đã lưu nhãn IP.');
             setReload(value => value + 1);
         } catch (requestError) {
-            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể cập nhật IP.');
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể cập nhật IP.'));
         } finally {
             setBusyIp('');
         }

@@ -10,10 +10,13 @@ const { createHash, randomBytes, randomUUID } = require('node:crypto');
 const path = require('node:path');
 const net = require('node:net');
 const database = require('./database');
+const barcodeRegistry = require('./barcode-registry');
 const SQLiteSessionStore = require('./session-store');
 
+barcodeRegistry.assertBarcodeRegistryReady(database);
+
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 const adminUsername = (process.env.ADMIN_USERNAME || '').trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD || '';
 const sessionSecret = process.env.SESSION_SECRET || '';
@@ -87,14 +90,12 @@ const generationRateLimit = rateLimit({
     legacyHeaders: false,
     message: { error: 'Đã vượt quá giới hạn tạo mã. Vui lòng thử lại sau.' },
 });
-const pruneExpiredHistory = database.transaction(cutoff => {
-    database.prepare('DELETE FROM history WHERE created_at < ?').run(cutoff);
-    database.prepare('DELETE FROM inventory_history WHERE created_at < ?').run(cutoff);
-});
-
 function pruneGeneratedCodeHistory() {
     try {
-        pruneExpiredHistory(new Date(Date.now() - generatedCodeRetentionMs).toISOString());
+        barcodeRegistry.pruneExpiredHistory(
+            database,
+            new Date(Date.now() - generatedCodeRetentionMs).toISOString(),
+        );
     } catch (error) {
         console.error('Không thể dọn lịch sử tạo mã quá hạn.', error);
     }
@@ -385,6 +386,16 @@ function parseFieldValues(value) {
     }
 }
 
+app.use((req, res, next) => {
+    if (process.env.NODE_ENV !== 'production'
+        || req.path === '/healthz'
+        || req.path === '/api'
+        || req.path.startsWith('/api/')) {
+        return next();
+    }
+    res.sendStatus(404);
+});
+
 app.get('/login', (req, res) => res.redirect('/admin'));
 
 app.get(['/', '/index.html'], blockIfIpBlocked, identifyAnonymousUser, (req, res) => {
@@ -530,22 +541,34 @@ app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRate
         return [field.key, field.visible ? submittedValue : field.defaultValue];
     }));
 
-    const result = database.prepare(`
-        INSERT INTO history (ip, barcode, district, commune, village, field_values, created_at, anonymous_user_id, creator_username)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        req.clientIp,
-        barcode.trim(),
-        chonHuyen,
-        chonXa,
-        chonThon,
-        JSON.stringify(fields),
-        new Date().toISOString(),
-        req.anonymousUserId,
-        creatorUsername,
-    );
+    let registration;
+    try {
+        registration = barcodeRegistry.registerHistory(database, barcode, normalizedBarcode => database.prepare(`
+            INSERT INTO history (ip, barcode, district, commune, village, field_values, created_at, anonymous_user_id, creator_username)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            req.clientIp,
+            normalizedBarcode,
+            chonHuyen,
+            chonXa,
+            chonThon,
+            JSON.stringify(fields),
+            new Date().toISOString(),
+            req.anonymousUserId,
+            creatorUsername,
+        ));
+    } catch (error) {
+        console.error('Không thể lưu lịch sử tạo mã.', { code: error.code || 'UNEXPECTED_ERROR' });
+        return res.status(500).json({ error: 'Không thể lưu lịch sử tạo mã.' });
+    }
 
-    res.status(201).json({ id: result.lastInsertRowid, fields });
+    if (registration.duplicate) {
+        return res.status(409).json({
+            error: 'Mã vận đơn đã tồn tại.',
+            code: 'BARCODE_ALREADY_EXISTS',
+        });
+    }
+    res.status(201).json({ id: registration.historyId, fields });
 });
 
 app.post('/api/kiemke', blockIfIpBlocked, identifyAnonymousUser, requireInventoryUser, generationRateLimit, async (req, res) => {
@@ -850,6 +873,27 @@ app.get('/api/admin/history', requireAdmin, (req, res) => {
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = 50;
     const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+    const barcodeLookup = typeof req.query.barcode === 'string' ? req.query.barcode.trim().slice(0, maxTextLength) : '';
+    if (barcodeLookup && database.prepare('SELECT 1 FROM barcode_registry WHERE barcode = ? COLLATE BINARY').get(barcodeLookup)) {
+        const resolution = barcodeRegistry.resolveBarcodeHistory(database, barcodeLookup);
+        const generatedCodeTotal = database.prepare(`
+            SELECT (SELECT COUNT(*) FROM history) + (SELECT COUNT(*) FROM inventory_history) AS count
+        `).get().count;
+        return res.json({
+            rows: resolution.rows,
+            total: resolution.rows.length,
+            generatedCodeTotal,
+            page: 1,
+            pages: 1,
+            barcodeResolution: {
+                barcode: resolution.barcode,
+                status: resolution.status,
+                registryStatus: resolution.registry?.status || null,
+                count: resolution.rows.length,
+                legacyHistoryCount: resolution.registry?.legacy_history_count || 0,
+            },
+        });
+    }
     const values = [];
     let where = '';
 
@@ -1367,6 +1411,27 @@ app.put('/api/admin/ips', requireAdmin, (req, res) => {
     res.sendStatus(204);
 });
 
-app.listen(port, () => {
-    console.log(`Ứng dụng đang chạy tại http://localhost:${port}`);
+app.use((error, req, res, next) => {
+    if (!req.path.startsWith('/api/') || res.headersSent) return next(error);
+
+    const status = Number(error.statusCode || error.status);
+    if (Number.isInteger(status) && status >= 400 && status < 500) return next(error);
+
+    console.error('Lỗi API chưa được xử lý.', { code: error.code || 'UNEXPECTED_ERROR' });
+    res.status(Number.isInteger(status) && status >= 500 && status < 600 ? status : 500)
+        .json({ error: 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.' });
 });
+
+if (require.main === module) {
+    const onListening = () => {
+        const host = process.env.NODE_ENV === 'production' ? '127.0.0.1' : 'localhost';
+        console.log(`Ứng dụng đang chạy tại http://${host}:${port}`);
+    };
+    if (process.env.NODE_ENV === 'production') {
+        app.listen(port, '127.0.0.1', onListening);
+    } else {
+        app.listen(port, onListening);
+    }
+}
+
+module.exports = app;

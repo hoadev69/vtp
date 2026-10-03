@@ -5,3 +5,8 @@ export function handleAdminAuthorizationError(error, onSessionExpired) {
     onSessionExpired(error.status === 401 ? 'login' : 'forbidden');
     return true;
 }
+
+export function getAdminErrorMessage(error, fallback) {
+    if (error instanceof ApiError && error.status >= 500) return fallback;
+    return error?.message || fallback;
+}

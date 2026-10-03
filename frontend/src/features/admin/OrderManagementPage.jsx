@@ -3,6 +3,7 @@ import { ApiError, apiRequest } from '../../shared/api/client.js';
 import InputControl from '../../shared/components/InputControl.jsx';
 import { useAppNavigation } from '../../shared/NavigationContext.jsx';
 import OrderDetailDialog from './OrderDetailDialog.jsx';
+import { getAdminErrorMessage } from './adminManagementUtils.js';
 
 function formatDate(value) {
     if (!value) return '—';
@@ -19,19 +20,19 @@ export default function OrderManagementPage({ onSessionExpired }) {
     const navigate = useAppNavigation();
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
+    const [barcodeLookup, setBarcodeLookup] = useState('');
     const [page, setPage] = useState(1);
     const [result, setResult] = useState(null);
     const [ipSummary, setIpSummary] = useState(null);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [listError, setListError] = useState('');
     const [summaryError, setSummaryError] = useState('');
-    const [detailError, setDetailError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
-    const [isRecreating, setIsRecreating] = useState(false);
 
     useEffect(() => {
         let current = true;
         const query = new URLSearchParams({ page: String(page), search });
+        if (barcodeLookup) query.set('barcode', barcodeLookup);
         setIsLoading(true);
         setListError('');
         apiRequest(`/api/admin/history?${query}`)
@@ -39,11 +40,13 @@ export default function OrderManagementPage({ onSessionExpired }) {
             .catch(error => {
                 if (!current) return;
                 if (error instanceof ApiError && error.status === 401) onSessionExpired('login');
-                else setListError(error.message || 'Không thể tải lịch sử đơn hàng.');
+                else if (error instanceof ApiError && error.status === 403) onSessionExpired('forbidden');
+                else setListError(getAdminErrorMessage(error, 'Không thể tải lịch sử đơn hàng.'));
+                setResult(null);
             })
             .finally(() => { if (current) setIsLoading(false); });
         return () => { current = false; };
-    }, [page, search, onSessionExpired]);
+    }, [page, search, barcodeLookup, onSessionExpired]);
 
     useEffect(() => {
         let current = true;
@@ -53,7 +56,9 @@ export default function OrderManagementPage({ onSessionExpired }) {
             .catch(error => {
                 if (!current) return;
                 if (error instanceof ApiError && error.status === 401) onSessionExpired('login');
-                else setSummaryError(error.message || 'Không thể tải tổng quan IP.');
+                else if (error instanceof ApiError && error.status === 403) onSessionExpired('forbidden');
+                else setSummaryError(getAdminErrorMessage(error, 'Không thể tải tổng quan IP.'));
+                setIpSummary(null);
             });
         return () => { current = false; };
     }, [onSessionExpired]);
@@ -61,31 +66,28 @@ export default function OrderManagementPage({ onSessionExpired }) {
     function submitSearch(event) {
         event.preventDefault();
         setPage(1);
-        setSearch(searchInput.trim().slice(0, 120));
+        const normalizedSearch = searchInput.trim();
+        setSearch(normalizedSearch.slice(0, 120));
+        setBarcodeLookup(normalizedSearch.slice(0, 512));
     }
 
     function clearSearch() {
         setSearchInput('');
         setSearch('');
+        setBarcodeLookup('');
         setPage(1);
     }
 
-    async function recreateOrder(order) {
-        if (!window.confirm(`Tạo lại tem cho mã vận đơn ${order.barcode}?`)) return;
-        setIsRecreating(true);
-        setDetailError('');
-        const payload = { barcode: order.barcode, chonHuyen: order.district, chonXa: order.commune, chonThon: order.village, fields: order.fields || {} };
-        try {
-            const created = await apiRequest('/api/history', { method: 'POST', body: payload });
-            const query = new URLSearchParams({ barcode: payload.barcode, chonHuyen: payload.chonHuyen, chonXa: payload.chonXa, chonThon: payload.chonThon });
-            Object.entries(created?.fields || {}).forEach(([key, value]) => query.set(key, value));
-            navigate(`/ketqua.html?${query}`);
-        } catch (error) {
-            if (error instanceof ApiError && error.status === 401) onSessionExpired('login');
-            else setDetailError(error.message || 'Không thể tạo lại tem.');
-        } finally {
-            setIsRecreating(false);
-        }
+    function printSelectedOrder(order) {
+        if (!window.confirm(`In lại tem từ đơn ${order.barcode}?`)) return;
+        const query = new URLSearchParams({
+            barcode: order.barcode,
+            chonHuyen: order.district,
+            chonXa: order.commune,
+            chonThon: order.village,
+        });
+        Object.entries(order.fields || {}).forEach(([key, value]) => query.set(key, value));
+        navigate(`/ketqua.html?${query}`);
     }
 
     const pages = Math.max(1, result?.pages || 1);
@@ -102,6 +104,14 @@ export default function OrderManagementPage({ onSessionExpired }) {
                 <article className="admin-metric admin-metric--blocked"><span>IP đang chặn</span><strong>{blockedCount == null ? '—' : blockedCount.toLocaleString('vi-VN')}</strong></article>
             </div>
             {summaryError && <p className="admin-message admin-message--error" role="alert">{summaryError}</p>}
+            {result?.barcodeResolution?.status === 'ambiguous' && (
+                <p className="admin-message" role="status">
+                    Mã {result.barcodeResolution.barcode} có {result.barcodeResolution.count} đơn lịch sử. Chọn đúng dòng đơn cần xem hoặc in lại.
+                </p>
+            )}
+            {result?.barcodeResolution?.status === 'released' && (
+                <p className="admin-message" role="status">Mã này đã được giải phóng sau khi hết thời hạn lưu lịch sử.</p>
+            )}
 
             <section className="admin-orders" aria-labelledby="admin-orders-title">
                 <div className="admin-orders__heading">
@@ -129,7 +139,7 @@ export default function OrderManagementPage({ onSessionExpired }) {
                                     <td data-label="Địa chỉ">{address}</td>
                                     <td data-label="IP">{order.ip === 'unknown' ? 'Chưa ghi nhận IP' : order.ip || '—'}</td>
                                     <td data-label="Người tạo">{creatorIdentity(order)}</td>
-                                    <td data-label="Chi tiết"><button className="admin-secondary-button" onClick={() => { setSelectedOrder(order); setDetailError(''); }} type="button">Xem chi tiết</button></td>
+                                    <td data-label="Chi tiết"><button className="admin-secondary-button" onClick={() => setSelectedOrder(order)} type="button">Xem chi tiết</button></td>
                                 </tr>;
                             })}</tbody>
                         </table></div>}
@@ -142,7 +152,7 @@ export default function OrderManagementPage({ onSessionExpired }) {
                     </div>
                 </footer>
             </section>
-            <OrderDetailDialog error={detailError} isRecreating={isRecreating} onClose={() => setSelectedOrder(null)} onRecreate={recreateOrder} order={selectedOrder} />
+            <OrderDetailDialog onClose={() => setSelectedOrder(null)} onPrintAgain={printSelectedOrder} order={selectedOrder} />
         </section>
     );
 }

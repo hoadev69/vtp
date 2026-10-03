@@ -39,6 +39,7 @@ export default function OrderForm({
                     clearable
                     id="barcodeInput"
                     name="barcode"
+                    maxLength={512}
                     onClear={() => onBarcodeChange('')}
                     type="text"
                     value={barcode}

@@ -8,7 +8,7 @@ function formatDate(value) {
     return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
-export default function OrderDetailDialog({ order, error, isRecreating, onClose, onRecreate }) {
+export default function OrderDetailDialog({ order, onClose, onPrintAgain }) {
     const dialogRef = useRef(null);
     const closeTimerRef = useRef(null);
     const [isClosing, setIsClosing] = React.useState(false);
@@ -74,11 +74,10 @@ export default function OrderDetailDialog({ order, error, isRecreating, onClose,
                             </div>
                         ))}
                     </dl>
-                    {error && <p className="admin-message admin-message--error" role="alert">{error}</p>}
                     <footer className="admin-order-dialog__footer">
                         <button className="admin-secondary-button" onClick={closeDialog} type="button">Đóng</button>
-                        <button className="admin-primary-button" disabled={isRecreating} onClick={() => onRecreate(order)} type="button">
-                            {isRecreating ? 'Đang tạo lại...' : 'Tạo lại tem'}
+                        <button className="admin-primary-button" onClick={() => onPrintAgain(order)} type="button">
+                            In lại tem
                         </button>
                     </footer>
                 </>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/client.js';
 import InputControl from '../../shared/components/InputControl.jsx';
-import { handleAdminAuthorizationError } from './adminManagementUtils.js';
+import { getAdminErrorMessage, handleAdminAuthorizationError } from './adminManagementUtils.js';
 
 export default function FormFieldManagement({ onSessionExpired }) {
     const [fields, setFields] = useState(null);
@@ -28,7 +28,9 @@ export default function FormFieldManagement({ onSessionExpired }) {
             })
             .catch(requestError => {
                 if (!current) return;
-                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể tải cấu hình trường nhập.');
+                setFields(null);
+                setDrafts({});
+                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể tải cấu hình trường nhập.'));
             })
             .finally(() => { if (current) setLoading(false); });
         return () => { current = false; };
@@ -51,7 +53,7 @@ export default function FormFieldManagement({ onSessionExpired }) {
             setMessage(`Đã lưu “${field.label}”.`);
             setReload(value => value + 1);
         } catch (requestError) {
-            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể lưu trường nhập.');
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể lưu trường nhập.'));
         } finally {
             setBusyKey('');
         }

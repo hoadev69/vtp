@@ -30,6 +30,8 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
     const [retryCount, setRetryCount] = useState(0);
     const qrDialogRef = useRef(null);
     const lockedDialogRef = useRef(null);
+    const loginInFlight = useRef(false);
+    const createInFlight = useRef(false);
 
     useEffect(() => {
         let current = true;
@@ -64,6 +66,8 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
                 if (!current) return;
                 if (error instanceof ApiError && error.status === 401) {
                     setView('login');
+                    setLoginMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+                    publishAuthChange(null);
                 } else if (error instanceof ApiError && error.status === 403) {
                     setView('forbidden');
                 } else {
@@ -93,6 +97,8 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
 
     async function submitLogin(event) {
         event.preventDefault();
+        if (loginInFlight.current) return;
+        loginInFlight.current = true;
         setLoginError('');
         setLoginMessage('');
         setIsSubmitting(true);
@@ -112,11 +118,14 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
                 setLoginError(getErrorMessage(error, 'Đăng nhập kiểm kê thất bại.'));
             }
         } finally {
+            loginInFlight.current = false;
             setIsSubmitting(false);
         }
     }
 
     async function createQrFromClipboard() {
+        if (createInFlight.current) return;
+        createInFlight.current = true;
         setPageError('');
         setIsCreating(true);
         try {
@@ -145,6 +154,7 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
                 setPageError(getErrorMessage(error, 'Không thể tạo mã QR.'));
             }
         } finally {
+            createInFlight.current = false;
             setIsCreating(false);
         }
     }

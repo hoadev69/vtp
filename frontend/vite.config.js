@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
-const backendTarget = process.env.VTP_BACKEND_ORIGIN || 'http://127.0.0.1:3000';
+const backendTarget = process.env.VTP_BACKEND_ORIGIN || 'http://127.0.0.1:3001';
 
 const publicAssets = [
     'manifest.webmanifest',

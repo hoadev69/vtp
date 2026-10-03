@@ -4,6 +4,7 @@ const inventoryOrdersRows = document.getElementById('inventoryOrdersRows');
 const anonymousUserRows = document.getElementById('anonymousUserRows');
 const ipRows = document.getElementById('ipRows');
 const historyError = document.getElementById('historyError');
+const historyBarcodeResolution = document.getElementById('historyBarcodeResolution');
 const inventoryAccountsError = document.getElementById('inventoryAccountsError');
 const inventoryOrdersError = document.getElementById('inventoryOrdersError');
 const inventoryAccountCreateDialog = document.getElementById('inventoryAccountCreateDialog');
@@ -312,7 +313,7 @@ function createRecreateButton(entry) {
     button.type = 'button';
     button.className = 'recreate-entry-button';
     button.dataset.recreateEntry = entry.id;
-    button.textContent = 'Tạo lại';
+    button.textContent = 'In lại';
     return button;
 }
 
@@ -356,40 +357,16 @@ document.getElementById('recreateCodeDialog').addEventListener('click', event =>
     if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
-document.getElementById('confirmRecreateCode').addEventListener('click', async event => {
+document.getElementById('confirmRecreateCode').addEventListener('click', event => {
     if (!activeRecreateEntry) return;
-    const button = event.currentTarget;
-    const errorMessage = document.getElementById('recreateCodeError');
-    errorMessage.hidden = true;
-    button.disabled = true;
-
-    try {
-        const response = await fetch('/api/history', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                barcode: activeRecreateEntry.barcode,
-                chonHuyen: activeRecreateEntry.district,
-                chonXa: activeRecreateEntry.commune,
-                chonThon: activeRecreateEntry.village,
-                fields: activeRecreateEntry.fields || {},
-            }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Không thể tạo lại mã.');
-        const values = new URLSearchParams({
-            barcode: activeRecreateEntry.barcode,
-            chonHuyen: activeRecreateEntry.district,
-            chonXa: activeRecreateEntry.commune,
-            chonThon: activeRecreateEntry.village,
-        });
-        Object.entries(result.fields || {}).forEach(([key, value]) => values.set(key, value));
-        window.location.assign(`/ketqua.html?${values}`);
-    } catch (error) {
-        errorMessage.textContent = error.message;
-        errorMessage.hidden = false;
-        button.disabled = false;
-    }
+    const values = new URLSearchParams({
+        barcode: activeRecreateEntry.barcode,
+        chonHuyen: activeRecreateEntry.district,
+        chonXa: activeRecreateEntry.commune,
+        chonThon: activeRecreateEntry.village,
+    });
+    Object.entries(activeRecreateEntry.fields || {}).forEach(([key, value]) => values.set(key, value));
+    window.location.assign(`/ketqua.html?${values}`);
 });
 
 const confirmDialog = document.getElementById('confirmDialog');
@@ -517,10 +494,20 @@ document.getElementById('nextIpHistoryPage').addEventListener('click', () => {
 async function loadHistory() {
     const requestGeneration = authGeneration;
     historyError.hidden = true;
-    const query = new URLSearchParams({ page: String(currentPage), search: searchInput.value.trim() });
+    historyBarcodeResolution.hidden = true;
+    const search = searchInput.value.trim();
+    const query = new URLSearchParams({ page: String(currentPage), search });
+    if (search) query.set('barcode', search.slice(0, 512));
     try {
         const result = await api(`/api/admin/history?${query}`);
         assertCurrentAdminRequest(requestGeneration);
+        if (result.barcodeResolution?.status === 'ambiguous') {
+            historyBarcodeResolution.textContent = `Mã ${result.barcodeResolution.barcode} có ${result.barcodeResolution.count} đơn lịch sử. Chọn đúng dòng đơn cần xem hoặc in lại.`;
+            historyBarcodeResolution.hidden = false;
+        } else if (result.barcodeResolution?.status === 'released') {
+            historyBarcodeResolution.textContent = 'Mã này đã được giải phóng sau khi hết thời hạn lưu lịch sử.';
+            historyBarcodeResolution.hidden = false;
+        }
         totalPages = result.pages;
         document.getElementById('historyCount').textContent = result.total.toLocaleString('vi-VN');
         document.getElementById('pageLabel').textContent = `Trang ${result.page} / ${result.pages}`;

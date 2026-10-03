@@ -3,9 +3,12 @@ const path = require('node:path');
 const Database = require('better-sqlite3');
 
 const databasePath = path.resolve(process.env.DATABASE_PATH || path.join(__dirname, 'data', 'history.sqlite'));
+if (process.env.NODE_ENV === 'production' && !fs.existsSync(databasePath)) {
+    throw new Error('Database file does not exist. Refusing to create a production database.');
+}
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 
-const database = new Database(databasePath);
+const database = new Database(databasePath, { fileMustExist: process.env.NODE_ENV === 'production' });
 database.pragma('journal_mode = WAL');
 database.pragma('foreign_keys = ON');
 database.exec(`

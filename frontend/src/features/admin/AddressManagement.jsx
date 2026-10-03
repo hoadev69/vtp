@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/client.js';
 import InputControl from '../../shared/components/InputControl.jsx';
-import { handleAdminAuthorizationError } from './adminManagementUtils.js';
+import { getAdminErrorMessage, handleAdminAuthorizationError } from './adminManagementUtils.js';
 
 const emptyDraft = { type: 'district', id: '', name: '', kind: 'district', districtId: '', communeId: '' };
 const resources = { district: 'districts', commune: 'communes', village: 'villages' };
@@ -23,7 +23,8 @@ export default function AddressManagement({ onSessionExpired }) {
             .then(result => { if (current) setDistricts(result); })
             .catch(requestError => {
                 if (!current) return;
-                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể tải địa bàn.');
+                setDistricts(null);
+                if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể tải địa bàn.'));
             })
             .finally(() => { if (current) setLoading(false); });
         return () => { current = false; };
@@ -70,7 +71,7 @@ export default function AddressManagement({ onSessionExpired }) {
             setDraft(emptyDraft);
             setReload(value => value + 1);
         } catch (requestError) {
-            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể lưu địa bàn.');
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể lưu địa bàn.'));
         } finally {
             setBusy(false);
         }
@@ -96,7 +97,7 @@ export default function AddressManagement({ onSessionExpired }) {
             if (draft.id === String(entity.id)) setDraft(emptyDraft);
             setReload(value => value + 1);
         } catch (requestError) {
-            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(requestError.message || 'Không thể cập nhật địa bàn.');
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể cập nhật địa bàn.'));
         } finally {
             setBusy(false);
         }

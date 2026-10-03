@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Navigation from './Navigation.jsx';
 import PageContainer from './PageContainer.jsx';
 import { useAppNavigation } from '../NavigationContext.jsx';
@@ -73,12 +73,12 @@ export default function AppShell({ children, currentPath }) {
         };
     }, [authRetry]);
 
-    function retryAuth() {
+    const retryAuth = useCallback(() => {
         authCheckId.current += 1;
         setAuthUser(null);
         setAuthStatus('checking');
         setAuthRetry(value => value + 1);
-    }
+    }, []);
 
     async function logout() {
         authCheckId.current += 1;

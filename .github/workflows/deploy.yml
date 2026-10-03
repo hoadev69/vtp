@@ -7,14 +7,56 @@ on:
 
 concurrency:
   group: vtp-production
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to VPS
+      - name: Checkout deployment commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install build dependencies
+        run: npm ci
+
+      - name: Build React application
+        run: npm run build
+
+      - name: Create and verify deployment package
+        run: bash scripts/package-release.sh "${GITHUB_SHA}" "${RUNNER_TEMP}/vtp-${GITHUB_SHA}.tar.gz"
+
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vtp-release-${{ github.sha }}
+          path: ${{ runner.temp }}/vtp-${{ github.sha }}.tar.gz*
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download verified deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: vtp-release-${{ github.sha }}
+          path: artifact
+
+      - name: Prepare upload directory
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -22,21 +64,41 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script_stop: true
           script: |
-            set -e
+            set -euo pipefail
+            test -d /var/www/vtp
+            mkdir -p /var/www/vtp/incoming
 
-            cd /var/www/vtp
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: artifact/*
+          target: /var/www/vtp/incoming
+          strip_components: 1
+          overwrite: true
 
-            echo "==> Pull latest code"
-            git pull --ff-only origin main
+      - name: Stage, activate, and verify release
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            app_root=/var/www/vtp
+            commit_sha='${{ github.sha }}'
+            release_id="${commit_sha}-${{ github.run_id }}"
+            archive="$app_root/incoming/vtp-${commit_sha}.tar.gz"
+            checksum="$archive.sha256"
+            stage="$app_root/staging/$release_id"
 
-            echo "==> Install production dependencies"
-            npm ci --omit=dev
-
-            echo "==> Restart VTP"
-            sudo systemctl restart vtp
-
-            echo "==> Check VTP"
-            sleep 2
-            systemctl is-active --quiet vtp
-
-            echo "==> Deployment completed successfully"
+            (cd "$app_root/incoming" && sha256sum -c "$(basename "$checksum")")
+            test ! -e "$stage"
+            mkdir -p "$stage"
+            tar -xzf "$archive" -C "$stage"
+            test "$(<"$stage/RELEASE_SHA")" = "$commit_sha"
+            bash "$stage/ops/deploy-release.sh" deploy "$release_id" "$app_root"
+            rm -f -- "$archive" "$checksum"
