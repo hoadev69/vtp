@@ -192,8 +192,10 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         await page.getByRole('button', { name: 'Xem chi tiết' }).first().click();
         await page.getByRole('heading', { name: 'LEGACY-AMBIG-97' }).waitFor();
         const historyPostsBeforeReprint = historyPostRequests.length;
-        page.on('dialog', dialog => dialog.accept());
         await page.getByRole('button', { name: 'In lại tem' }).click();
+        const reprintDialog = page.getByRole('dialog', { name: 'Xác nhận in lại tem' });
+        await reprintDialog.getByText('LEGACY-AMBIG-97').waitFor();
+        await reprintDialog.getByRole('button', { name: 'In lại tem' }).click();
         await page.getByRole('heading', { name: 'Tem vận chuyển' }).waitFor();
         assert.equal(historyPostRequests.length, historyPostsBeforeReprint);
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='LEGACY-AMBIG-97'").get().count, 2);
@@ -204,16 +206,17 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         const ipRow = page.locator('.admin-management-table tbody tr').filter({ hasText: '203.0.113.97' });
         await ipRow.waitFor();
         assert.equal(await page.locator('.admin-management-table input[aria-label^="Nhãn IP "]').count(), 0);
-        await ipRow.getByRole('button', { name: 'Sửa nhãn' }).click();
-        assert.equal(await page.locator('.admin-management-table input[aria-label^="Nhãn IP "]').count(), 1);
-        await ipRow.getByRole('button', { name: 'Hủy' }).click();
+        assert.equal(await ipRow.getByRole('button', { name: 'Sửa nhãn' }).count(), 0);
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        assert.equal(await ipRow.locator('input[aria-label^="Nhãn IP "]').count(), 1);
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Hủy' }).click();
         assert.equal(await page.locator('.admin-management-table input[aria-label^="Nhãn IP "]').count(), 0);
-        await ipRow.getByRole('button', { name: 'Sửa nhãn' }).click();
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
         await ipRow.locator('input[aria-label="Nhãn IP 203.0.113.97"]').fill('Nhóm giao nhận');
-        await ipRow.getByRole('button', { name: 'Lưu' }).click();
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Lưu nhãn' }).click();
         await page.getByText('Nhóm giao nhận', { exact: true }).waitFor();
 
-        await ipRow.getByRole('button', { name: 'Sửa nhãn' }).click();
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
         await ipRow.locator('input[aria-label="Nhãn IP 203.0.113.97"]').fill('Nhãn chưa lưu');
         await ipRow.getByRole('button', { name: 'Chặn IP' }).click();
         await page.getByRole('dialog', { name: 'Xác nhận chặn IP' }).getByText('203.0.113.97').waitFor();
@@ -226,6 +229,80 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         assert.equal(blockedIp?.blocked, 1);
         assert.equal(blockedIp?.label, 'Nhóm giao nhận');
         await page.getByText('Nhóm giao nhận', { exact: true }).waitFor();
+
+        await page.getByRole('button', { name: 'Trường nhập' }).click();
+        await page.getByRole('heading', { name: 'Trường nhập liệu' }).waitFor();
+        const fieldInput = page.locator('.admin-fields-table input[aria-label="Nhãn nhapTen"]');
+        assert.equal(await fieldInput.count(), 0);
+        const originalFieldLabel = database.prepare("SELECT label FROM form_fields WHERE field_key = 'nhapTen'").get().label;
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        await fieldInput.fill('Nhãn sẽ hủy');
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Hủy' }).click();
+        assert.equal(await fieldInput.count(), 0);
+        assert.equal(database.prepare("SELECT label FROM form_fields WHERE field_key = 'nhapTen'").get().label, originalFieldLabel);
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        await fieldInput.fill('Nhãn acceptance tạm');
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Lưu thay đổi' }).click();
+        await page.getByText('Đã lưu 1 trường nhập.', { exact: true }).waitFor();
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        await fieldInput.fill(originalFieldLabel);
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Lưu thay đổi' }).click();
+        await page.getByText(`Đã lưu 1 trường nhập.`, { exact: true }).waitFor();
+
+        await page.getByRole('button', { name: 'Địa chỉ' }).click();
+        await page.getByRole('heading', { name: 'Địa bàn' }).waitFor();
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Thêm địa bàn' }).click();
+        let addressDialog = page.getByRole('dialog', { name: 'Thêm địa bàn' });
+        await addressDialog.getByLabel('Loại địa bàn').selectOption('district');
+        await addressDialog.getByLabel('Cấp hành chính').selectOption('city');
+        await addressDialog.getByRole('textbox', { name: 'Tên địa bàn' }).fill('Phase97 UI City');
+        await addressDialog.getByRole('button', { name: 'Thêm địa bàn' }).click();
+        const districtRow = page.locator('.admin-address-table tbody tr.admin-address-row--district').filter({ hasText: 'Phase97 UI City' });
+        await districtRow.waitFor();
+        assert.equal(await districtRow.getByRole('button', { name: 'Sửa' }).count(), 0);
+        await districtRow.getByRole('button', { name: 'Mở xã trực thuộc Phase97 UI City' }).click();
+
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Thêm địa bàn' }).click();
+        addressDialog = page.getByRole('dialog', { name: 'Thêm địa bàn' });
+        await addressDialog.getByLabel('Loại địa bàn').selectOption('commune');
+        await addressDialog.locator('select').nth(1).selectOption({ label: 'Phase97 UI City' });
+        await addressDialog.getByRole('textbox', { name: 'Tên địa bàn' }).fill('Phase97 UI Commune');
+        await addressDialog.getByRole('button', { name: 'Thêm địa bàn' }).click();
+        const communeRow = page.locator('.admin-address-table tbody tr.admin-address-row--commune').filter({ hasText: 'Phase97 UI Commune' });
+        await communeRow.waitFor();
+        await communeRow.getByRole('button', { name: 'Mở thôn trực thuộc Phase97 UI Commune' }).click();
+
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Thêm địa bàn' }).click();
+        addressDialog = page.getByRole('dialog', { name: 'Thêm địa bàn' });
+        await addressDialog.getByLabel('Loại địa bàn').selectOption('village');
+        await addressDialog.locator('select').nth(1).selectOption({ label: 'Phase97 UI City' });
+        await addressDialog.locator('select').nth(2).selectOption({ label: 'Phase97 UI City · Phase97 UI Commune' });
+        await addressDialog.getByRole('textbox', { name: 'Tên địa bàn' }).fill('Phase97 UI Village');
+        await addressDialog.getByRole('button', { name: 'Thêm địa bàn' }).click();
+        let villageRow = page.locator('.admin-address-table tbody tr.admin-address-row--village').filter({ hasText: 'Phase97 UI Village' });
+        await villageRow.waitFor();
+
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        assert.equal(await districtRow.getByRole('button', { name: 'Sửa' }).count(), 1);
+        await villageRow.getByRole('button', { name: 'Sửa' }).click();
+        addressDialog = page.getByRole('dialog', { name: 'Sửa địa bàn' });
+        await addressDialog.getByRole('textbox', { name: 'Tên địa bàn' }).fill('Phase97 UI Village Updated');
+        await addressDialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
+        await page.getByText('Đã cập nhật địa bàn.', { exact: true }).waitFor();
+        villageRow = page.locator('.admin-address-table tbody tr.admin-address-row--village').filter({ hasText: 'Phase97 UI Village Updated' });
+        await villageRow.waitFor();
+        await villageRow.getByRole('button', { name: 'Ẩn' }).click();
+        await villageRow.getByText('Đang ẩn').waitFor();
+        await villageRow.getByRole('button', { name: 'Hiện' }).click();
+        await villageRow.getByText('Đang hiện').waitFor();
+        await villageRow.getByRole('button', { name: 'Xóa' }).click();
+        const deleteAddressDialog = page.getByRole('dialog', { name: 'Xác nhận xóa địa bàn' });
+        await deleteAddressDialog.getByText('Phase97 UI Village Updated').waitFor();
+        await deleteAddressDialog.getByRole('button', { name: 'Xóa địa bàn' }).click();
+        await villageRow.waitFor({ state: 'detached' });
+        await districtRow.getByRole('button', { name: 'Xóa' }).click();
+        await page.getByRole('dialog', { name: 'Xác nhận xóa địa bàn' }).getByRole('button', { name: 'Xóa địa bàn' }).click();
+        await districtRow.waitFor({ state: 'detached' });
 
         await page.goto(`${origin}/admin`);
         await page.locator('#admin-order-search').fill('LEGACY-AMBIG-97');
@@ -264,6 +341,8 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         await page.getByRole('button', { name: 'Lấy mã từ clipboard' }).click();
         await page.locator('.inventory-dialog[open] .inventory-dialog__qr').waitFor();
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM inventory_history WHERE waybill='INV-P97-ADMIN' AND creator_username='phase97.admin'").get().count, 1);
+        await page.locator('.inventory-dialog[open]').getByRole('button', { name: 'Đóng' }).click();
+        await page.locator('.inventory-dialog[open]').waitFor({ state: 'hidden' });
 
         const operatorContext = await browserContext();
         contexts.push(operatorContext);
@@ -296,6 +375,90 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         await operatorPage.evaluate(() => window.__releaseClipboard());
         await operatorPage.locator('.inventory-dialog[open] .inventory-dialog__qr').waitFor();
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM inventory_history WHERE waybill='INV-P97-DOUBLE' AND creator_username='phase97.operator'").get().count, 1);
+
+        await page.goto(`${origin}/admin`);
+        await page.getByRole('button', { name: 'Tài khoản' }).click();
+        await page.getByRole('heading', { name: 'Tài khoản' }).waitFor();
+        const operatorRow = page.locator('.admin-account-table tbody tr').filter({ hasText: 'phase97.operator' });
+        await operatorRow.waitFor();
+        assert.equal(await operatorRow.locator('select').count(), 0);
+        await operatorRow.getByRole('button', { name: '1', exact: true }).click();
+        const ordersDialog = page.getByRole('dialog', { name: 'Đơn hàng · phase97.operator' });
+        await ordersDialog.getByText('INV-P97-DOUBLE', { exact: true }).waitFor();
+        await ordersDialog.getByRole('button', { name: 'Tạo QR' }).click();
+        const waybillQr = ordersDialog.locator('img[alt="Mã QR INV-P97-DOUBLE"]');
+        await page.waitForFunction(() => {
+            const image = document.querySelector('img[alt="Mã QR INV-P97-DOUBLE"]');
+            return image?.complete && image.naturalWidth > 0;
+        });
+        assert.equal(new URL(await waybillQr.getAttribute('src'), origin).searchParams.get('text'), 'INV-P97-DOUBLE');
+        await ordersDialog.getByRole('button', { name: 'Đóng hộp thoại' }).click();
+
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Tạo tài khoản' }).click();
+        let accountDialog = page.getByRole('dialog', { name: 'Tạo tài khoản' });
+        await accountDialog.locator('input[name="username"]').fill('phase97.ui-account');
+        await accountDialog.locator('input[name="password"]').fill('phase97-ui-password');
+        await accountDialog.locator('select[name="role"]').selectOption('operator');
+        await accountDialog.getByRole('button', { name: 'Hủy' }).click();
+        assert.equal(database.prepare("SELECT COUNT(*) AS count FROM users WHERE username = 'phase97.ui-account'").get().count, 0);
+
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Tạo tài khoản' }).click();
+        accountDialog = page.getByRole('dialog', { name: 'Tạo tài khoản' });
+        await accountDialog.locator('input[name="username"]').fill('phase97.ui-account');
+        await accountDialog.locator('input[name="password"]').fill('phase97-ui-password');
+        await accountDialog.locator('select[name="role"]').selectOption('operator');
+        await accountDialog.getByRole('button', { name: 'Tạo tài khoản' }).click();
+        await page.getByText('Đã tạo tài khoản phase97.ui-account.', { exact: true }).waitFor();
+        await page.locator('.admin-management-filters input').first().fill('phase97.ui-account');
+        await page.getByRole('button', { name: 'Tìm kiếm' }).click();
+        const uiAccountRow = page.locator('.admin-account-table tbody tr').filter({ hasText: 'phase97.ui-account' });
+        await uiAccountRow.waitFor();
+
+        await uiAccountRow.getByRole('button', { name: 'Đặt mật khẩu' }).click();
+        const passwordDialog = page.getByRole('dialog', { name: 'Đặt mật khẩu' });
+        await passwordDialog.locator('input[name="password"]').fill('phase97-ui-password-reset');
+        await passwordDialog.getByRole('button', { name: 'Hủy' }).click();
+        await uiAccountRow.getByRole('button', { name: 'Đặt mật khẩu' }).click();
+        const savedPasswordDialog = page.getByRole('dialog', { name: 'Đặt mật khẩu' });
+        await savedPasswordDialog.locator('input[name="password"]').fill('phase97-ui-password-reset');
+        await savedPasswordDialog.getByRole('button', { name: 'Lưu mật khẩu' }).click();
+        await page.getByText('Đã đặt lại mật khẩu cho phase97.ui-account.', { exact: true }).waitFor();
+        assert.equal((await login('/api/kiemke/login', 'phase97.ui-account', 'phase97-ui-password-reset')).response.status, 200);
+
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        await uiAccountRow.locator('select[aria-label="Vai trò phase97.ui-account"]').selectOption('admin');
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Hủy' }).click();
+        assert.equal(database.prepare("SELECT role FROM users WHERE username = 'phase97.ui-account'").get().role, 'operator');
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        await uiAccountRow.locator('select[aria-label="Vai trò phase97.ui-account"]').selectOption('admin');
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Lưu vai trò' }).click();
+        await page.getByText('Đã cập nhật 1 vai trò.', { exact: true }).waitFor();
+        assert.equal(database.prepare("SELECT role FROM users WHERE username = 'phase97.ui-account'").get().role, 'admin');
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Sửa' }).click();
+        await uiAccountRow.locator('select[aria-label="Vai trò phase97.ui-account"]').selectOption('operator');
+        await page.locator('.admin-mini-toolbar').getByRole('button', { name: 'Lưu vai trò' }).click();
+        await page.getByText('Đã cập nhật 1 vai trò.', { exact: true }).waitFor();
+
+        await uiAccountRow.getByRole('button', { name: 'Khóa' }).click();
+        const statusDialog = page.getByRole('dialog', { name: 'Xác nhận khóa tài khoản' });
+        await statusDialog.getByLabel('Lý do khóa').fill('Acceptance UI lock reason');
+        await statusDialog.getByRole('button', { name: 'Hủy' }).click();
+        assert.equal(database.prepare("SELECT active FROM users WHERE username = 'phase97.ui-account'").get().active, 1);
+        await uiAccountRow.getByRole('button', { name: 'Khóa' }).click();
+        const confirmedStatusDialog = page.getByRole('dialog', { name: 'Xác nhận khóa tài khoản' });
+        await confirmedStatusDialog.getByLabel('Lý do khóa').fill('Acceptance UI lock reason');
+        await confirmedStatusDialog.getByRole('button', { name: 'Khóa tài khoản' }).click();
+        await page.getByText('Đã khóa tài khoản.', { exact: true }).waitFor();
+        assert.equal(database.prepare("SELECT active FROM users WHERE username = 'phase97.ui-account'").get().active, 0);
+        await uiAccountRow.getByRole('button', { name: 'Mở khóa' }).click();
+        await page.getByRole('dialog', { name: 'Xác nhận mở khóa tài khoản' }).getByRole('button', { name: 'Mở khóa' }).click();
+        await page.getByText('Đã mở khóa tài khoản.', { exact: true }).waitFor();
+        assert.equal(database.prepare("SELECT active FROM users WHERE username = 'phase97.ui-account'").get().active, 1);
+
+        await page.setViewportSize({ width: 390, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+        await page.setViewportSize({ width: 1280, height: 720 });
+
         const guestInventory = await request('/api/kiemke/me');
         assert.equal(guestInventory.status, 401);
         const guestCreate = await request('/api/kiemke', { method: 'POST', body: { waybill: 'INV-P97-GUEST' } });
@@ -381,11 +544,12 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         assert.equal(routeResults['/'].status, 200);
         assert.match(routeResults['/'].body, /index(?:-[^" ]+)?\.js|barcodeInput/);
         assert.doesNotMatch(routeResults['/'].body, /src="\/src\/main\.jsx"/);
-        assert.equal(routeResults['/admin'].status, 401);
-        assert.match(routeResults['/admin'].body, /admin/);
-        assert.doesNotMatch(routeResults['/admin'].body, /assets\/index-[^" ]+\.js/);
+        assert.equal(routeResults['/admin'].status, 200);
+        assert.match(routeResults['/admin'].body, /<div id="root"><\/div>/);
+        assert.match(routeResults['/admin'].body, /assets\/index-[^" ]+\.js/);
         assert.equal(routeResults['/kiemke'].status, 200);
-        assert.match(routeResults['/kiemke'].body, /operatorLoginPanel/);
+        assert.match(routeResults['/kiemke'].body, /<div id="root"><\/div>/);
+        assert.match(routeResults['/kiemke'].body, /assets\/index-[^" ]+\.js/);
         assert.equal(routeResults['/api/form-fields'].status, 200);
         assert.match(routeResults['/api/form-fields'].type, /application\/json/);
         assert.equal(routeResults['/api/geography'].status, 200);

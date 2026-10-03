@@ -13,7 +13,7 @@ function formatDate(value) {
 export default function IpManagement({ onSessionExpired }) {
     const [ips, setIps] = useState(null);
     const [drafts, setDrafts] = useState({});
-    const [editingIp, setEditingIp] = useState('');
+    const [isEditMode, setIsEditMode] = useState(false);
     const [pendingAction, setPendingAction] = useState(null);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
@@ -51,7 +51,6 @@ export default function IpManagement({ onSessionExpired }) {
             await apiRequest('/api/admin/ips', { method: 'PUT', body: { ip: entry.ip, label, blocked } });
             setMessage(blocked !== Boolean(entry.blocked) ? (blocked ? 'Đã chặn IP.' : 'Đã bỏ chặn IP.') : 'Đã lưu nhãn IP.');
             setDrafts(value => ({ ...value, [entry.ip]: label }));
-            setEditingIp('');
             setReload(value => value + 1);
         } catch (requestError) {
             if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể cập nhật IP.'));
@@ -64,24 +63,70 @@ export default function IpManagement({ onSessionExpired }) {
         if (!pendingAction) return;
         const { entry, blocked } = pendingAction;
         setPendingAction(null);
+        setIsEditMode(false);
         await saveIp(entry, blocked, entry.label || '');
     }
 
-    function cancelLabelEdit(entry) {
-        setDrafts(value => ({ ...value, [entry.ip]: entry.label || '' }));
-        setEditingIp('');
+    function cancelLabelEdit() {
+        setDrafts(Object.fromEntries((ips || []).map(entry => [entry.ip, entry.label || ''])));
+        setIsEditMode(false);
     }
 
-    function beginLabelEdit(entry) {
-        setDrafts(value => ({ ...value, [entry.ip]: entry.label || '' }));
-        setEditingIp(entry.ip);
+    async function saveLabels() {
+        const changedEntries = (ips || []).filter(entry => (drafts[entry.ip] ?? entry.label ?? '') !== (entry.label || ''));
+        if (!changedEntries.length) {
+            setIsEditMode(false);
+            return;
+        }
+        setError('');
+        setMessage('');
+        setBusyIp('all');
+        const savedLabels = {};
+        let requestError = null;
+        try {
+            for (const entry of changedEntries) {
+                const label = drafts[entry.ip] ?? '';
+                await apiRequest('/api/admin/ips', {
+                    method: 'PUT',
+                    body: { ip: entry.ip, label, blocked: Boolean(entry.blocked) },
+                });
+                savedLabels[entry.ip] = label;
+            }
+        } catch (error) {
+            requestError = error;
+        } finally {
+            setBusyIp('');
+        }
+        if (Object.keys(savedLabels).length) {
+            setIps(current => current.map(entry => savedLabels[entry.ip] === undefined
+                ? entry
+                : { ...entry, label: savedLabels[entry.ip] }));
+            setDrafts(current => ({ ...current, ...savedLabels }));
+        }
+        if (requestError) {
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể lưu nhãn IP.'));
+            return;
+        }
+        setMessage(`Đã lưu ${changedEntries.length} nhãn IP.`);
+        setIsEditMode(false);
     }
 
     const visibleIps = (ips || []).filter(entry => `${entry.ip} ${entry.label || ''}`.toLowerCase().includes(search.trim().toLowerCase()));
 
     return (
         <section className="admin-management" aria-labelledby="ip-management-title">
-            <header className="admin-management__heading"><div><p className="admin-eyebrow">QUẢN TRỊ</p><h1 id="ip-management-title">IP truy cập</h1></div></header>
+            <header className="admin-management__heading">
+                <div><p className="admin-eyebrow">QUẢN TRỊ</p><h1 id="ip-management-title">IP truy cập</h1></div>
+                {ips?.length > 0 && <div className="admin-mini-toolbar" aria-label="Thao tác nhãn IP">
+                    {isEditMode ? <>
+                        <button className="admin-secondary-button" disabled={busyIp === 'all'} onClick={cancelLabelEdit} type="button">Hủy</button>
+                        <button className="admin-primary-button" disabled={busyIp === 'all'} onClick={saveLabels} type="button">{busyIp === 'all' ? 'Đang lưu...' : 'Lưu nhãn'}</button>
+                    </> : <button className="admin-secondary-button" onClick={() => {
+                        setDrafts(Object.fromEntries((ips || []).map(entry => [entry.ip, entry.label || ''])));
+                        setIsEditMode(true);
+                    }} type="button">Sửa</button>}
+                </div>}
+            </header>
             <div className="admin-management-filters"><label>Tìm IP hoặc nhãn<InputControl clearLabel="tìm IP hoặc nhãn" clearable onChange={event => setSearch(event.target.value)} onClear={() => setSearch('')} value={search} /></label></div>
             {error && <p className="admin-message admin-message--error" role="alert">{error}</p>}
             {message && <p className="admin-message admin-message--success" role="status">{message}</p>}
@@ -92,23 +137,15 @@ export default function IpManagement({ onSessionExpired }) {
                         <tbody>{visibleIps.map(entry => {
                             const unknown = entry.ip === 'unknown';
                             const label = drafts[entry.ip] ?? entry.label ?? '';
-                            const changed = label !== (entry.label || '');
                             return <tr key={entry.ip}>
                                 <td className="admin-field-key" data-label="Địa chỉ IP">{unknown ? 'Chưa ghi nhận IP' : entry.ip}</td>
                                 <td data-label="Nhãn">
-                                    {editingIp === entry.ip ? (
+                                    {isEditMode && !unknown ? (
                                         <div className="admin-ip-label-editor">
-                                            <InputControl aria-label={`Nhãn IP ${entry.ip}`} clearLabel={`nhãn IP ${entry.ip}`} clearable disabled={busyIp === entry.ip} maxLength="80" onChange={event => setDrafts(value => ({ ...value, [entry.ip]: event.target.value }))} onClear={() => setDrafts(value => ({ ...value, [entry.ip]: '' }))} value={label} />
-                                            <div className="admin-management-actions">
-                                                <button className="admin-primary-button" disabled={busyIp === entry.ip || !changed} onClick={() => saveIp(entry)} type="button">Lưu</button>
-                                                <button className="admin-secondary-button" disabled={busyIp === entry.ip} onClick={() => cancelLabelEdit(entry)} type="button">Hủy</button>
-                                            </div>
+                                            <InputControl aria-label={`Nhãn IP ${entry.ip}`} clearLabel={`nhãn IP ${entry.ip}`} clearable disabled={busyIp === 'all'} maxLength="80" onChange={event => setDrafts(value => ({ ...value, [entry.ip]: event.target.value }))} onClear={() => setDrafts(value => ({ ...value, [entry.ip]: '' }))} value={label} />
                                         </div>
                                     ) : (
-                                        <div className="admin-ip-label-display">
-                                            <span>{entry.label || '—'}</span>
-                                            <button className="admin-secondary-button" disabled={unknown || busyIp === entry.ip} onClick={() => beginLabelEdit(entry)} type="button">Sửa nhãn</button>
-                                        </div>
+                                        <span className="admin-ip-label-display">{entry.label || '—'}</span>
                                     )}
                                 </td>
                                 <td data-label="Số mã">{Number(entry.code_count || 0).toLocaleString('vi-VN')}</td>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ApiError, apiRequest } from '../../shared/api/client.js';
 import InputControl from '../../shared/components/InputControl.jsx';
+import ConfirmationDialog from '../../shared/components/ConfirmationDialog.jsx';
 import { useAppNavigation } from '../../shared/NavigationContext.jsx';
 import OrderDetailDialog from './OrderDetailDialog.jsx';
 import { getAdminErrorMessage } from './adminManagementUtils.js';
@@ -25,6 +26,7 @@ export default function OrderManagementPage({ onSessionExpired }) {
     const [result, setResult] = useState(null);
     const [ipSummary, setIpSummary] = useState(null);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [printConfirmation, setPrintConfirmation] = useState(null);
     const [listError, setListError] = useState('');
     const [summaryError, setSummaryError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -79,7 +81,14 @@ export default function OrderManagementPage({ onSessionExpired }) {
     }
 
     function printSelectedOrder(order) {
-        if (!window.confirm(`In lại tem từ đơn ${order.barcode}?`)) return;
+        setSelectedOrder(null);
+        setPrintConfirmation(order);
+    }
+
+    function confirmPrintSelectedOrder() {
+        if (!printConfirmation) return;
+        const order = printConfirmation;
+        setPrintConfirmation(null);
         const query = new URLSearchParams({
             barcode: order.barcode,
             chonHuyen: order.district,
@@ -153,6 +162,15 @@ export default function OrderManagementPage({ onSessionExpired }) {
                 </footer>
             </section>
             <OrderDetailDialog onClose={() => setSelectedOrder(null)} onPrintAgain={printSelectedOrder} order={selectedOrder} />
+            <ConfirmationDialog
+                cancelLabel="Hủy"
+                confirmLabel="In lại tem"
+                description={printConfirmation ? `In lại tem từ đơn ${printConfirmation.barcode}?` : ''}
+                onCancel={() => setPrintConfirmation(null)}
+                onConfirm={confirmPrintSelectedOrder}
+                open={Boolean(printConfirmation)}
+                title="Xác nhận in lại tem"
+            />
         </section>
     );
 }
