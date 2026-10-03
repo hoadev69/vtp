@@ -193,24 +193,20 @@ test('Inventory React and API integrate with isolated SQLite', async () => {
         contexts.push(adminContext);
         const adminPage = await adminContext.newPage();
         await adminPage.goto(`${origin}/kiemke`);
-        const adminLogin = await adminPage.evaluate(async () => {
-            const response = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: 'phase95.admin', password: 'phase95-admin-password' }),
-            });
-            return response.status;
-        });
-        assert.equal(adminLogin, 200);
-        await adminPage.goto(`${origin}/kiemke`);
+        await adminPage.locator('#inventory-username').fill('phase95.admin');
+        await adminPage.locator('#inventory-password').fill('phase95-admin-password');
+        await adminPage.getByRole('button', { name: 'Đăng nhập' }).click();
         await adminPage.getByRole('button', { name: 'Lấy mã từ clipboard' }).waitFor();
+        await adminPage.locator('.app-navigation__links a[href="/admin"]').waitFor();
         const adminInventory = await adminPage.evaluate(async () => {
-            const [session, create] = await Promise.all([
+            const [admin, session, create] = await Promise.all([
+                fetch('/api/admin/me'),
                 fetch('/api/kiemke/me'),
                 fetch('/api/kiemke', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ waybill: 'WB-95-ADMIN' }) }),
             ]);
-            return { session: session.status, create: create.status, result: await create.json() };
+            return { admin: admin.status, session: session.status, create: create.status, result: await create.json() };
         });
+        assert.equal(adminInventory.admin, 200);
         assert.equal(adminInventory.session, 200);
         assert.equal(adminInventory.create, 201);
         assert.match(adminInventory.result.qrCode, /^data:image\/png;base64,/);

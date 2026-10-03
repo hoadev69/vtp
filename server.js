@@ -489,40 +489,49 @@ app.get('/api/kiemke/me', requireInventoryUser, (req, res) => {
 app.post('/api/kiemke/login', blockIfIpBlocked, inventoryLoginRateLimit, async (req, res) => {
     const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
-    const user = await authenticateUser(username, password, 'operator');
+    const user = database.prepare(`
+        SELECT id, username, password_hash, role, active, disabled_reason
+        FROM users WHERE username = ? AND role IN ('admin', 'operator')
+    `).get(username);
 
-    if (!user) {
+    if (!user || !await bcrypt.compare(password, user.password_hash)) {
         return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
     }
     if (!user.active) {
         return res.status(403).json({
             code: 'ACCOUNT_DISABLED',
-            error: 'Tài khoản kiểm kê đã bị khóa.',
+            error: 'Tài khoản đã bị khóa.',
             reason: user.disabled_reason || 'Vui lòng liên hệ quản trị viên.',
         });
     }
 
-    const token = randomBytes(32).toString('base64url');
-    const tokenHash = hashInventorySessionToken(token);
-    const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
-    database.prepare(`
-        INSERT INTO inventory_sessions (token_hash, user_id, expires_at, created_at)
-        VALUES (?, ?, ?, ?)
-    `).run(tokenHash, user.id, expiresAt, new Date().toISOString());
+    let token;
+    let tokenHash;
+    if (user.role === 'operator') {
+        token = randomBytes(32).toString('base64url');
+        tokenHash = hashInventorySessionToken(token);
+        const expiresAt = Date.now() + 8 * 60 * 60 * 1000;
+        database.prepare(`
+            INSERT INTO inventory_sessions (token_hash, user_id, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+        `).run(tokenHash, user.id, expiresAt, new Date().toISOString());
+    }
     try {
         await createAuthenticatedSession(req, user);
     } catch (error) {
-        database.prepare('DELETE FROM inventory_sessions WHERE token_hash = ?').run(tokenHash);
+        if (tokenHash) database.prepare('DELETE FROM inventory_sessions WHERE token_hash = ?').run(tokenHash);
         throw error;
     }
-    res.cookie('vtp.kiemke.sid', token, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 8 * 60 * 60 * 1000,
-        path: '/',
-    });
-    res.json({ id: user.id, username: user.username });
+    if (token) {
+        res.cookie('vtp.kiemke.sid', token, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 8 * 60 * 60 * 1000,
+            path: '/',
+        });
+    }
+    res.json({ id: user.id, username: user.username, role: user.role });
 });
 
 app.post('/api/kiemke/logout', requireInventoryUser, (req, res, next) => {
