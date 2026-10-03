@@ -108,8 +108,7 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
                 body: { username: loginUsername, password },
             });
             setPassword('');
-            setView('inventory');
-            publishAuthChange(user.role, user.username);
+            onRetryAuth();
         } catch (error) {
             setPassword('');
             if (error instanceof ApiError && error.status === 403 && error.data?.code === 'ACCOUNT_DISABLED') {

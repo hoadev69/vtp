@@ -197,7 +197,13 @@ test('Inventory React and API integrate with isolated SQLite', async () => {
         await adminPage.locator('#inventory-password').fill('phase95-admin-password');
         await adminPage.getByRole('button', { name: 'Đăng nhập' }).click();
         await adminPage.getByRole('button', { name: 'Lấy mã từ clipboard' }).waitFor();
-        await adminPage.locator('.app-navigation__links a[href="/admin"]').waitFor();
+        const desktopAdminLink = adminPage.locator('.app-navigation__links a[href="/admin"]');
+        await desktopAdminLink.waitFor();
+        assert.equal(await desktopAdminLink.isVisible(), true);
+        await adminPage.setViewportSize({ width: 390, height: 844 });
+        const mobileAdminLink = adminPage.locator('.bottom-navigation a[href="/admin"]');
+        await mobileAdminLink.waitFor();
+        assert.equal(await mobileAdminLink.isVisible(), true);
         const adminInventory = await adminPage.evaluate(async () => {
             const [admin, session, create] = await Promise.all([
                 fetch('/api/admin/me'),
