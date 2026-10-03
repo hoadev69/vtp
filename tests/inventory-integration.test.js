@@ -204,6 +204,11 @@ test('Inventory React and API integrate with isolated SQLite', async () => {
         const mobileAdminLink = adminPage.locator('.bottom-navigation a[href="/admin"]');
         await mobileAdminLink.waitFor();
         assert.equal(await mobileAdminLink.isVisible(), true);
+        const inventoryHeadingBox = await adminPage.locator('.inventory-page__heading').boundingBox();
+        const createButtonBox = await adminPage.locator('.inventory-page__create').boundingBox();
+        const bottomNavigationBox = await adminPage.locator('.bottom-navigation').boundingBox();
+        assert.ok(createButtonBox.y - inventoryHeadingBox.y >= 96);
+        assert.ok(bottomNavigationBox.y - (createButtonBox.y + createButtonBox.height) >= 24);
         const adminInventory = await adminPage.evaluate(async () => {
             const [admin, session, create] = await Promise.all([
                 fetch('/api/admin/me'),

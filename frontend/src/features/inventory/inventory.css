@@ -191,6 +191,7 @@
     }
 
     .inventory-workspace {
-        padding-block: var(--space-8);
+        padding-top: clamp(4rem, 12vh, 6rem);
+        padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
     }
 }
