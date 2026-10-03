@@ -43,6 +43,15 @@
 .admin-pagination > div { display: flex; gap: var(--space-2); }
 .admin-order-dialog { width: min(620px, calc(100vw - 24px)); max-width: 620px; max-height: min(86dvh, 760px); padding: clamp(16px, 4vw, 24px); overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-lg); }
 .admin-order-dialog::backdrop { background: var(--color-overlay); }
+.admin-confirmation-dialog { width: min(440px, calc(100vw - 24px)); max-width: 440px; padding: clamp(18px, 4vw, 24px); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-lg); }
+.admin-confirmation-dialog::backdrop { background: var(--color-overlay); }
+.admin-confirmation-dialog__content { display: grid; gap: var(--space-4); }
+.admin-confirmation-dialog h2 { margin: 0; font-size: var(--font-size-section-title); }
+.admin-confirmation-dialog p { margin: 0; color: var(--color-text-secondary); line-height: 1.5; overflow-wrap: anywhere; }
+.admin-confirmation-dialog footer { display: flex; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.admin-ip-label-display, .admin-ip-label-editor { display: grid; gap: var(--space-2); }
+.admin-ip-label-display > span { min-height: 24px; overflow-wrap: anywhere; }
+.admin-ip-label-editor .admin-management-actions { min-width: 0; }
 .admin-order-dialog__header, .admin-order-dialog__footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .admin-order-dialog__header { margin-bottom: var(--space-5); }
 .admin-order-dialog__header h2 { margin: 0; overflow-wrap: anywhere; font-size: var(--font-size-section-title); }

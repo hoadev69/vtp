@@ -199,6 +199,35 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='LEGACY-AMBIG-97'").get().count, 2);
 
         await page.goto(`${origin}/admin`);
+        await page.getByRole('button', { name: 'IP truy cập' }).click();
+        await page.getByRole('heading', { name: 'IP truy cập' }).waitFor();
+        const ipRow = page.locator('.admin-management-table tbody tr').filter({ hasText: '203.0.113.97' });
+        await ipRow.waitFor();
+        assert.equal(await page.locator('.admin-management-table input[aria-label^="Nhãn IP "]').count(), 0);
+        await ipRow.getByRole('button', { name: 'Sửa nhãn' }).click();
+        assert.equal(await page.locator('.admin-management-table input[aria-label^="Nhãn IP "]').count(), 1);
+        await ipRow.getByRole('button', { name: 'Hủy' }).click();
+        assert.equal(await page.locator('.admin-management-table input[aria-label^="Nhãn IP "]').count(), 0);
+        await ipRow.getByRole('button', { name: 'Sửa nhãn' }).click();
+        await ipRow.locator('input[aria-label="Nhãn IP 203.0.113.97"]').fill('Nhóm giao nhận');
+        await ipRow.getByRole('button', { name: 'Lưu' }).click();
+        await page.getByText('Nhóm giao nhận', { exact: true }).waitFor();
+
+        await ipRow.getByRole('button', { name: 'Sửa nhãn' }).click();
+        await ipRow.locator('input[aria-label="Nhãn IP 203.0.113.97"]').fill('Nhãn chưa lưu');
+        await ipRow.getByRole('button', { name: 'Chặn IP' }).click();
+        await page.getByRole('dialog', { name: 'Xác nhận chặn IP' }).getByText('203.0.113.97').waitFor();
+        await page.getByRole('dialog').getByRole('button', { name: 'Hủy' }).click();
+        assert.equal(database.prepare('SELECT blocked FROM ip_controls WHERE ip = ?').get('203.0.113.97')?.blocked || 0, 0);
+        await ipRow.getByRole('button', { name: 'Chặn IP' }).click();
+        await page.getByRole('dialog', { name: 'Xác nhận chặn IP' }).getByRole('button', { name: 'Chặn IP' }).click();
+        await page.getByText('Đã chặn IP.', { exact: true }).waitFor();
+        const blockedIp = database.prepare('SELECT blocked, label FROM ip_controls WHERE ip = ?').get('203.0.113.97');
+        assert.equal(blockedIp?.blocked, 1);
+        assert.equal(blockedIp?.label, 'Nhóm giao nhận');
+        await page.getByText('Nhóm giao nhận', { exact: true }).waitFor();
+
+        await page.goto(`${origin}/admin`);
         await page.locator('#admin-order-search').fill('LEGACY-AMBIG-97');
         await page.getByRole('button', { name: 'Tìm kiếm' }).click();
         await page.waitForFunction(() => document.querySelectorAll('.admin-order-table tbody tr').length === 2);
@@ -338,7 +367,7 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         assert.ok(resultLine, productionRoutes.stdout);
         const routeResults = JSON.parse(resultLine.slice('PHASE97_RESULTS='.length));
         assert.equal(routeResults['/'].status, 200);
-        assert.match(routeResults['/'].body, /index\.js|barcodeInput/);
+        assert.match(routeResults['/'].body, /index(?:-[^" ]+)?\.js|barcodeInput/);
         assert.doesNotMatch(routeResults['/'].body, /src="\/src\/main\.jsx"/);
         assert.equal(routeResults['/admin'].status, 401);
         assert.match(routeResults['/admin'].body, /admin/);
