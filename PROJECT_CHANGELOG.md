@@ -20,6 +20,11 @@
 - Verification: `node --test tests/database-integrity.test.js` passed. No frontend build was needed.
 - Not verified: any production/VPS database or runtime. Existing additive DDL/bootstrap in `database.js` remains unchanged.
 
+## Barcode reuse
+
+- Public order creation accepts a barcode that already exists; each successful submission records another history row and registry mapping.
+- Concurrent submissions with the same barcode are both retained. Admin lookup continues to show multiple matching history rows as ambiguous.
+
 ## Phase 9.7 - System Acceptance Test
 
 - Files added: `tests/system-acceptance.test.js`, `PHASE_9_7_SYSTEM_ACCEPTANCE_REPORT.md`.

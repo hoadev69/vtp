@@ -169,16 +169,20 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         await page.locator('#soHang').fill('7');
         await page.locator('#tenHang').fill('Conflict data stays in form');
         await page.getByRole('button', { name: 'Gửi' }).click();
-        await page.getByRole('alert').filter({ hasText: 'Mã vận đơn này đã được sử dụng.' }).waitFor();
-        assert.equal(await page.locator('#barcodeInput').inputValue(), 'P97-ORDER-001');
-        assert.equal(await page.locator('#nhapTen').inputValue(), 'Retained after conflict');
-        assert.equal(await page.locator('#nhapSdt').inputValue(), '0987654321');
-        assert.equal(await page.locator('#soHang').inputValue(), '7');
-        assert.equal(await page.locator('#tenHang').inputValue(), 'Conflict data stays in form');
-        assert.equal((await request('/api/history', {
+        await page.getByRole('heading', { name: 'Tem vận chuyển' }).waitFor();
+        assert.equal(await page.locator('.result-label-svg title').first().textContent(), 'Tem vận chuyển P97-ORDER-001');
+        const repeatedHistory = database.prepare("SELECT id, field_values FROM history WHERE barcode='P97-ORDER-001' ORDER BY id DESC LIMIT 1").get();
+        assert.ok(repeatedHistory.id > createdHistory.id);
+        assert.deepEqual(JSON.parse(repeatedHistory.field_values), {
+            nhapTen: 'Retained after conflict', nhapSdt: '0987654321', soHang: '7', tenHang: 'Conflict data stays in form',
+        });
+        assert.equal(historyPostRequests.length, 2);
+        const duplicateResponse = await request('/api/history', {
             method: 'POST', body: { barcode: 'P97-ORDER-001', chonHuyen: 'TP.Lào Cai', chonXa: 'Thống Nhất', chonThon: '', fields: {} },
-        })).status, 409);
-        assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='P97-ORDER-001'").get().count, 1);
+        });
+        assert.equal(duplicateResponse.status, 201);
+        assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='P97-ORDER-001'").get().count, 3);
+        assert.equal(database.prepare("SELECT COUNT(*) AS count FROM barcode_registry_history WHERE barcode='P97-ORDER-001'").get().count, 3);
         assert.equal(historyPostRequests.length, 2);
 
         await page.goto(`${origin}/admin`);
@@ -474,15 +478,15 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         assert.equal(guestCreate.status, 401);
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM inventory_history WHERE waybill='INV-P97-GUEST'").get().count, 0);
 
-        const stillReferencedAttempt = await request('/api/history', {
+        const duplicateWhileReferenced = await request('/api/history', {
             method: 'POST',
             body: { barcode: 'RELEASE-SYS-97', chonHuyen: 'TP.Lào Cai', chonXa: 'Thống Nhất', chonThon: '', fields: {} },
         });
-        assert.equal(stillReferencedAttempt.status, 409);
-        const remainingReleaseRow = database.prepare("SELECT id FROM history WHERE barcode='RELEASE-SYS-97'").get();
-        assert.ok(remainingReleaseRow);
-        database.prepare('UPDATE history SET created_at = ? WHERE id = ?')
-            .run(new Date(now.getTime() - 100 * 60 * 60 * 1000).toISOString(), remainingReleaseRow.id);
+        assert.equal(duplicateWhileReferenced.status, 201);
+        assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='RELEASE-SYS-97'").get().count, 2);
+        assert.equal(database.prepare("SELECT COUNT(*) AS count FROM barcode_registry_history WHERE barcode='RELEASE-SYS-97'").get().count, 2);
+        database.prepare("UPDATE history SET created_at = ? WHERE barcode='RELEASE-SYS-97'")
+            .run(new Date(now.getTime() - 100 * 60 * 60 * 1000).toISOString());
         const releaseCleanup = pruneExpiredHistory(database, now.toISOString());
         assert.equal(releaseCleanup.historyDeleted >= 1, true);
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='RELEASE-SYS-97'").get().count, 0);

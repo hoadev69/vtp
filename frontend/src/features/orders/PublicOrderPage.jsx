@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { ApiError, apiRequest } from '../../shared/api/client.js';
+import { apiRequest } from '../../shared/api/client.js';
 import { useAppNavigation } from '../../shared/NavigationContext.jsx';
 import OrderForm from './OrderForm.jsx';
 
@@ -115,11 +115,7 @@ export default function PublicOrderPage() {
             Object.entries(result?.fields || {}).forEach(([key, value]) => query.set(key, value));
             navigate(`/ketqua.html?${query}`);
         } catch (error) {
-            if (error instanceof ApiError && error.status === 409 && error.data?.code === 'BARCODE_ALREADY_EXISTS') {
-                setSubmitError('Mã vận đơn này đã được sử dụng. Vui lòng kiểm tra lại mã.');
-            } else {
-                setSubmitError(error.message || 'Không thể lưu lịch sử tạo mã.');
-            }
+            setSubmitError(error.message || 'Không thể lưu lịch sử tạo mã.');
         } finally {
             submitLock.current = false;
             setIsSubmitting(false);

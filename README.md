@@ -1,6 +1,6 @@
 # VTP Label Generator
 
-Ứng dụng Node.js tạo tem có barcode Code 128 và QR. Người dùng tạo mã không cần tài khoản; hệ thống lưu IP, nội dung mã, địa chỉ và thời điểm tạo trong SQLite.
+Ứng dụng Node.js tạo tem có barcode Code 128 và QR. Người dùng tạo mã không cần tài khoản; hệ thống lưu IP, nội dung mã, địa chỉ và thời điểm tạo trong SQLite. Mã vận đơn đã có vẫn có thể tạo lại; mỗi lần lưu sẽ thêm một bản ghi lịch sử riêng, nên tra cứu mã đó có thể trả về nhiều kết quả.
 
 ## Chạy ứng dụng
 

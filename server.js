@@ -593,12 +593,6 @@ app.post('/api/history', blockIfIpBlocked, identifyAnonymousUser, generationRate
         return res.status(500).json({ error: 'Không thể lưu lịch sử tạo mã.' });
     }
 
-    if (registration.duplicate) {
-        return res.status(409).json({
-            error: 'Mã vận đơn đã tồn tại.',
-            code: 'BARCODE_ALREADY_EXISTS',
-        });
-    }
     res.status(201).json({ id: registration.historyId, fields });
 });
 

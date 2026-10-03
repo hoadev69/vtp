@@ -157,17 +157,14 @@ function registerHistory(database, rawBarcode, insertHistory, registeredAt = new
                 registered_at = excluded.registered_at,
                 released_at = NULL,
                 legacy_history_count = 0
-            WHERE barcode_registry.status = 'released'
         `).run(barcode, registeredAt);
-
-        if (registration.changes === 0) return { duplicate: true };
 
         const historyResult = insertHistory(barcode);
         const historyId = Number(historyResult.lastInsertRowid);
         database.prepare(`
             INSERT INTO barcode_registry_history (barcode, history_id) VALUES (?, ?)
         `).run(barcode, historyId);
-        return { duplicate: false, historyResult, historyId, barcode };
+        return { historyResult, historyId, barcode };
     });
 
     return register.immediate();

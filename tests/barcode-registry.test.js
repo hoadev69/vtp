@@ -68,14 +68,13 @@ test('migration backfills all legacy rows and reruns idempotently', () => {
     }
 });
 
-test('registration rejects active barcode, rolls back insert failures, and RELEASE waits for every row', () => {
+test('registration allows duplicate barcodes, rolls back insert failures, and RELEASE waits for every row', () => {
     const database = createMemoryDatabase();
     try {
         addHistory(database, 1, 'OLD-DUP', '2026-10-01T00:00:00.000Z');
         addHistory(database, 2, 'OLD-DUP', '2026-10-03T00:00:00.000Z');
         applyBarcodeRegistryMigration(database);
 
-        assert.equal(registerHistory(database, 'OLD-DUP', () => assert.fail('duplicate must not insert')).duplicate, true);
         assert.throws(() => registerHistory(database, 'ROLLBACK', () => { throw new Error('forced insert failure'); }), /forced insert failure/);
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM barcode_registry WHERE barcode = 'ROLLBACK'").get().count, 0);
 
@@ -108,8 +107,14 @@ test('registration rejects active barcode, rolls back insert failures, and RELEA
         const reuse = registerHistory(database, ' OLD-DUP ', barcode => database.prepare(
             'INSERT INTO history (barcode, created_at) VALUES (?, ?)',
         ).run(barcode, '2026-10-04T00:00:00.000Z'));
-        assert.equal(reuse.duplicate, false);
+        const secondUse = registerHistory(database, 'OLD-DUP', barcode => database.prepare(
+            'INSERT INTO history (barcode, created_at) VALUES (?, ?)',
+        ).run(barcode, '2026-10-04T00:00:01.000Z'));
+        assert.notEqual(reuse.historyId, secondUse.historyId);
         assert.equal(database.prepare("SELECT status FROM barcode_registry WHERE barcode = 'OLD-DUP'").get().status, 'new');
+        assert.equal(database.prepare("SELECT COUNT(*) AS count FROM barcode_registry_history WHERE barcode = 'OLD-DUP'").get().count, 2);
+        assert.equal(resolveBarcodeHistory(database, 'OLD-DUP').status, 'ambiguous');
+        assert.equal(resolveBarcodeHistory(database, 'OLD-DUP').rows.length, 2);
         assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
     } finally {
         database.close();
@@ -123,16 +128,19 @@ test('trim is preserved while barcode matching remains case-sensitive', () => {
         const insert = barcode => registerHistory(database, barcode, normalized => database.prepare(
             'INSERT INTO history (barcode, created_at) VALUES (?, ?)',
         ).run(normalized, '2026-10-03T00:00:00.000Z'));
-        assert.equal(insert('  Case-Code  ').duplicate, false);
-        assert.equal(insert('Case-Code').duplicate, true);
-        assert.equal(insert('case-code').duplicate, false);
+        const first = insert('  Case-Code  ');
+        const repeated = insert('Case-Code');
+        const lower = insert('case-code');
+        assert.notEqual(first.historyId, repeated.historyId);
+        assert.notEqual(repeated.historyId, lower.historyId);
         assert.equal(database.prepare('SELECT COUNT(*) AS count FROM barcode_registry').get().count, 2);
+        assert.equal(database.prepare('SELECT COUNT(*) AS count FROM barcode_registry_history').get().count, 3);
     } finally {
         database.close();
     }
 });
 
-test('concurrent independent SQLite writers create only one row per barcode', async () => {
+test('concurrent independent SQLite writers keep duplicate history rows under one registry key', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vtp-barcode-race-'));
     const databasePath = path.join(directory, 'race.sqlite');
     const database = new Database(databasePath);
@@ -160,7 +168,7 @@ test('concurrent independent SQLite writers create only one row per barcode', as
             const result = registerHistory(database, 'RACE-CODE', barcode => database.prepare(
                 'INSERT INTO history (barcode, created_at) VALUES (?, ?)',
             ).run(barcode, '2026-10-03T00:00:00.000Z'));
-            parentPort.postMessage({ duplicate: result.duplicate });
+            parentPort.postMessage({ historyId: result.historyId });
         } catch (error) {
             parentPort.postMessage({ error: error.message });
         } finally {
@@ -178,12 +186,12 @@ test('concurrent independent SQLite writers create only one row per barcode', as
     try {
         const results = await Promise.all(workers.map(worker => once(worker, 'message').then(([message]) => message)));
         assert.deepEqual(results.filter(result => result.error), []);
-        assert.equal(results.filter(result => result.duplicate).length, 1);
-        assert.equal(results.filter(result => !result.duplicate).length, 1);
+        assert.equal(new Set(results.map(result => result.historyId)).size, 2);
         const verify = new Database(databasePath, { readonly: true, fileMustExist: true });
         try {
-            assert.equal(verify.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode = 'RACE-CODE'").get().count, 1);
+            assert.equal(verify.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode = 'RACE-CODE'").get().count, 2);
             assert.equal(verify.prepare("SELECT COUNT(*) AS count FROM barcode_registry WHERE barcode = 'RACE-CODE'").get().count, 1);
+            assert.equal(verify.prepare("SELECT COUNT(*) AS count FROM barcode_registry_history WHERE barcode = 'RACE-CODE'").get().count, 2);
         } finally {
             verify.close();
         }
@@ -263,7 +271,7 @@ test('HTTP create and Admin ambiguous lookup preserve authorization and response
             assert.deepEqual(data.rows.map(row => row.barcode), ['LEGACY-DUP', 'LEGACY-DUP']);
         });
 
-        await t.test('POST creates trimmed barcode once and returns a stable non-PII conflict', async () => {
+        await t.test('POST records every create even when the barcode is already used', async () => {
             const body = { barcode: '  NEW-HTTP-1  ', chonHuyen: 'TP.Lào Cai', chonXa: 'Thống Nhất', chonThon: '', fields: {} };
             const created = await jsonRequest('/api/history', body);
             assert.equal(created.status, 201);
@@ -272,17 +280,19 @@ test('HTTP create and Admin ambiguous lookup preserve authorization and response
             assert.equal(database.prepare('SELECT barcode FROM history WHERE id=?').get(createdData.id).barcode, 'NEW-HTTP-1');
 
             const duplicate = await jsonRequest('/api/history', { ...body, barcode: 'NEW-HTTP-1' });
-            assert.equal(duplicate.status, 409);
+            assert.equal(duplicate.status, 201);
             const duplicateData = await duplicate.json();
-            assert.equal(duplicateData.code, 'BARCODE_ALREADY_EXISTS');
-            assert.deepEqual(Object.keys(duplicateData).sort(), ['code', 'error']);
+            assert.equal(typeof duplicateData.id, 'number');
+            assert.notEqual(duplicateData.id, createdData.id);
+            assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='NEW-HTTP-1'").get().count, 2);
+            assert.equal(resolveBarcodeHistory(database, 'NEW-HTTP-1').status, 'ambiguous');
 
             const outcomes = await Promise.all([
                 jsonRequest('/api/history', { ...body, barcode: 'RACING-HTTP' }),
                 jsonRequest('/api/history', { ...body, barcode: 'RACING-HTTP' }),
             ]);
-            assert.deepEqual(outcomes.map(response => response.status).sort(), [201, 409]);
-            assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='RACING-HTTP'").get().count, 1);
+            assert.deepEqual(outcomes.map(response => response.status), [201, 201]);
+            assert.equal(database.prepare("SELECT COUNT(*) AS count FROM history WHERE barcode='RACING-HTTP'").get().count, 2);
 
             database.exec(`
                 CREATE TRIGGER fail_history_insert BEFORE INSERT ON history
