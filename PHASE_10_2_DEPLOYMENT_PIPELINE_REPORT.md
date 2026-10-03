@@ -27,7 +27,7 @@ The packaging script performs a temporary `npm ci --omit=dev`, verifies required
 ## GitHub Actions Flow
 
 1. A push to `main` checks out exactly `github.sha` and runs Node.js 24, `npm ci`, one Vite build, package verification, then uploads the archive/checksum for one day.
-2. The deploy job has `needs: build`; it cannot start after a failed build/package job. It downloads and checksums the archive, uploads it over SCP, extracts a unique `<commit-sha>-<run-id>` staging directory, and calls the release helper.
+2. The deploy job has `needs: build`; it cannot start after a failed build/package job. It downloads and checksums the archive, uploads it over SCP, extracts a `<commit-sha>-<run-id>-<run-attempt>` staging directory, and calls the release helper. Including the attempt number prevents reruns from colliding with retained stage/release directories.
 3. Concurrency no longer cancels an active deployment. The build job receives no VPS secrets; deploy uses only existing secrets `VPS_HOST`, `VPS_USER`, and `VPS_SSH_KEY` (SSH port remains the existing default 22). No secret or token is copied into the artifact or added to build environment variables.
 
 The workflow YAML parsed with Ruby's YAML parser and structural assertions verified the `main` trigger and `deploy.needs: build`. `actionlint` is not installed in this workspace. The workflow has not been run by GitHub; no push or dispatch was issued.
@@ -38,7 +38,7 @@ The workflow YAML parsed with Ruby's YAML parser and structural assertions verif
 /var/www/vtp/
   .env                         # existing runtime config, never in artifact
   data/history.sqlite          # persistent database, never in artifact
-  current -> releases/<sha>-<run-id>
+  current -> releases/<sha>-<run-id>-<run-attempt>
   releases/<release-id>/       # frontend, backend, lockfiles, target node_modules
   staging/<release-id>/        # extracted candidate, moved after validation
   incoming/                     # temporary archive and checksum

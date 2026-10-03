@@ -43,5 +43,6 @@ test('VTP runtime configuration consistently uses port 3001 and the persistent S
     assert.match(inventory, /127\\\.0\\\.0\\\.1:3001/);
     assert.match(inventory, /elif \[\[ "\$database_path" != "\$app_root\/data\/history\.sqlite" \]\]/);
     assert.match(workflow, /bash scripts\/package-release\.sh/);
+    assert.match(workflow, /github\.run_attempt/);
     assert.match(workflow, /bash "\$stage\/ops\/deploy-release\.sh" deploy/);
 });

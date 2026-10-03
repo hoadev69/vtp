@@ -18,6 +18,8 @@ test('release activation and rollback preserve active releases and SQLite', () =
     const appRoot = path.join(temporaryRoot, 'app');
     const tools = path.join(temporaryRoot, 'tools');
     const releaseIds = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((letter, index) => `${letter.repeat(40)}-${index + 1}`);
+    releaseIds[0] = 'baseline-live-test';
+    releaseIds[1] = `${'b'.repeat(40)}-2-1`;
     const [previousId, healthyId, healthFailureId, restartFailureId, permissionFailureId, noDatabasePathId, noUserId, dependencyFailureId, unsafePermissionId, frontendFailureId] = releaseIds;
     const databasePath = path.join(appRoot, 'data', 'history.sqlite');
     let liveDatabase;

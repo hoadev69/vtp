@@ -90,7 +90,7 @@ jobs:
             set -euo pipefail
             app_root=/var/www/vtp
             commit_sha='${{ github.sha }}'
-            release_id="${commit_sha}-${{ github.run_id }}"
+            release_id="${commit_sha}-${{ github.run_id }}-${{ github.run_attempt }}"
             archive="$app_root/incoming/vtp-${commit_sha}.tar.gz"
             checksum="$archive.sha256"
             stage="$app_root/staging/$release_id"

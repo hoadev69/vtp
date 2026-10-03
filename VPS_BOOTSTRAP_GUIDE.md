@@ -140,7 +140,7 @@ Mục tiêu sau bootstrap:
 /var/www/vtp/
   .env
   data/history.sqlite                 # persistent; giữ nguyên vị trí/nội dung đã xác minh
-  current -> releases/<sha>-<run-id>
+  current -> releases/<sha>-<run-id>-<run-attempt>
   releases/<release-id>/              # backend, frontend/dist, production node_modules
   staging/<release-id>/               # candidate trước activation
   incoming/                            # archive/checksum tạm
@@ -213,7 +213,7 @@ done
 
 Lệnh này không xóa/di chuyển hay ghi nội dung SQLite/WAL/SHM. Chạy trong cửa sổ bảo trì đã duyệt; xác nhận lại bằng `stat` và inventory. Giữ nguyên `.env` hiện mode `0600`.
 
-Baseline release phải được tạo từ đúng code đang chạy, đặt trong `releases/<40-hex-sha>-<run-id>`, có dependencies phù hợp, và chứa symlink `data -> /var/www/vtp/data`. **Không thể suy ra source baseline từ repo hoặc địa chỉ VPS**; lấy source/commit từ inventory và operator xác nhận trước khi copy. Không ghi đè thư mục release, `.env`, DB, WAL/SHM hay `current`; chỉ tạo `current` khi baseline hoàn chỉnh và đã có backup.
+Baseline release phải được tạo từ đúng code đang chạy, có dependencies phù hợp, và chứa symlink `data -> /var/www/vtp/data`. **Không thể suy ra source baseline từ repo hoặc địa chỉ VPS**; lấy source/commit từ inventory và operator xác nhận trước khi copy. Release ID của workflow mới có dạng `<40-hex-sha>-<run-id>-<run-attempt>`; helper vẫn nhận release ID cũ `<40-hex-sha>-<run-id>` để tương thích. Không ghi đè thư mục release, `.env`, DB, WAL/SHM hay `current`; chỉ tạo `current` khi baseline hoàn chỉnh và đã có backup.
 
 Sau khi baseline tồn tại, tạo drop-in cho đúng service hiện tại. Reset rồi khai báo lại duy nhất `EnvironmentFile=/var/www/vtp/.env`; credentials vẫn giữ trong `.env` tại app root và không bị copy vào unit. Helper xác nhận file regular/private, đồng thời tiếp tục đòi runtime keys tường minh trong `Environment`:
 

@@ -19,12 +19,12 @@ service_uid=''
 service_gid=''
 service_environment=''
 
-if [[ ! "$release_id" =~ ^[0-9a-f]{40}-[0-9]+$ ]]; then
+if [[ ! "$release_id" =~ ^([0-9a-f]{40}-[0-9]+(-[0-9]+)?|baseline-[a-z0-9]+(-[a-z0-9]+)*)$ ]]; then
     echo "Invalid release id." >&2
     exit 2
 fi
 if [[ "$action" != deploy && "$action" != rollback ]]; then
-    echo "Usage: $0 <deploy|rollback> <commit-sha-run-id> [app-root]" >&2
+    echo "Usage: $0 <deploy|rollback> <commit-sha-run-id[-attempt]> [app-root]" >&2
     exit 2
 fi
 if [[ ! -d "$app_root" || -L "$app_root" ]]; then
@@ -275,7 +275,7 @@ stage="$staging_dir/$release_id"
 release="$releases_dir/$release_id"
 [[ -d "$stage" && ! -L "$stage" ]] || die "Staged artifact directory is missing."
 [[ ! -e "$release" && ! -L "$release" ]] || die "Release id already exists; refusing to overwrite it."
-[[ "$(<"$stage/RELEASE_SHA")" == "${release_id%-*}" ]] || die "Artifact commit SHA does not match the release id."
+[[ "$(<"$stage/RELEASE_SHA")" == "${release_id%%-*}" ]] || die "Artifact commit SHA does not match the release id."
 [[ -s "$stage/frontend/dist/index.html" && -s "$stage/server.js" ]] || die "Staged artifact is incomplete."
 [[ ! -e "$stage/.env" && ! -e "$stage/data" && ! -e "$stage/node_modules" ]] \
     || die "Staged artifact contains runtime environment, data, or dependencies."
