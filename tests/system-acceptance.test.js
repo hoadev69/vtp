@@ -248,7 +248,19 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
             });
         });
         await page.goto(`${origin}/kiemke`);
-        await page.getByRole('button', { name: 'Lấy mã từ clipboard' }).waitFor();
+        const clipboardButton = page.getByRole('button', { name: 'Lấy mã từ clipboard' });
+        await clipboardButton.waitFor();
+        const clipboardButtonPosition = await clipboardButton.evaluate(button => {
+            const rect = button.getBoundingClientRect();
+            const viewport = window.visualViewport;
+            const visibleBottom = viewport ? viewport.height + viewport.offsetTop : window.innerHeight;
+            return {
+                position: getComputedStyle(button).position,
+                bottomGap: visibleBottom - rect.bottom,
+            };
+        });
+        assert.equal(clipboardButtonPosition.position, 'fixed');
+        assert.ok(clipboardButtonPosition.bottomGap >= 11 && clipboardButtonPosition.bottomGap <= 13);
         await page.getByRole('button', { name: 'Lấy mã từ clipboard' }).click();
         await page.locator('.inventory-dialog[open] .inventory-dialog__qr').waitFor();
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM inventory_history WHERE waybill='INV-P97-ADMIN' AND creator_username='phase97.admin'").get().count, 1);

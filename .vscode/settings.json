@@ -481,6 +481,10 @@
         "/^ssh root@180\\.93\\.115\\.158 'printf \"CURRENT=%s\\\\n\" \"\\$\\(readlink -f /var/www/vtp/current\\)\"; printf \"BACKUPS\\\\n\"; find /var/www/vtp/backups -maxdepth 1 -type f -printf \"%f %s bytes\\\\n\" \\| sort; printf \"RELEASES\\\\n\"; find /var/www/vtp/releases -mindepth 1 -maxdepth 1 -type d -printf \"%f\\\\n\" \\| sort'$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^node --test tests/system-acceptance\\.test\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

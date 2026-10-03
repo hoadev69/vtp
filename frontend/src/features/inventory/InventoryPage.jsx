@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ApiError, apiRequest } from '../../shared/api/client.js';
 import InputControl from '../../shared/components/InputControl.jsx';
 import './inventory.css';
@@ -218,14 +219,17 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
             {isAuthenticated && (
                 <div className="inventory-workspace">
                     {pageError && <p className="inventory-page__error" role="alert">{pageError}</p>}
-                    <button
-                        className="inventory-page__primary inventory-page__create"
-                        disabled={isCreating}
-                        onClick={createQrFromClipboard}
-                        type="button"
-                    >{isCreating ? 'Đang tạo mã...' : 'Lấy mã từ clipboard'}</button>
                     {!qrResult && <p className="inventory-page__state" role="status">Chưa có mã QR mới trong phiên này.</p>}
                 </div>
+            )}
+            {isAuthenticated && createPortal(
+                <button
+                    className="inventory-page__primary inventory-page__create"
+                    disabled={isCreating}
+                    onClick={createQrFromClipboard}
+                    type="button"
+                >{isCreating ? 'Đang tạo mã...' : 'Lấy mã từ clipboard'}</button>,
+                document.body,
             )}
 
             <dialog

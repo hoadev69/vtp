@@ -97,8 +97,18 @@
 }
 
 .inventory-page__create {
+    position: fixed;
+    z-index: var(--z-index-overlay);
+    left: 50%;
+    bottom: calc(12px + env(safe-area-inset-bottom) + var(--vtp-keyboard-inset, 0px));
+    width: min(calc(100vw - 32px), 520px);
     min-height: var(--control-height-prominent);
-    min-width: min(100%, 320px);
+    transform: translateX(-50%);
+    box-shadow: var(--shadow-md);
+}
+
+.inventory-page__create:hover:not(:disabled) {
+    transform: translate(-50%, -1px);
 }
 
 .inventory-page__state {
