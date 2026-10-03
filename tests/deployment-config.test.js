@@ -46,3 +46,14 @@ test('VTP runtime configuration consistently uses port 3001 and the persistent S
     assert.match(workflow, /github\.run_attempt/);
     assert.match(workflow, /bash "\$stage\/ops\/deploy-release\.sh" deploy/);
 });
+
+test('installed PWA checks for service-worker updates and reloads after activation', () => {
+    const entrypoint = read('frontend/src/main.jsx');
+
+    assert.match(entrypoint, /updateViaCache:\s*'none'/);
+    assert.match(entrypoint, /registration\.update\(\)/);
+    assert.match(entrypoint, /addEventListener\('pageshow'/);
+    assert.match(entrypoint, /addEventListener\('visibilitychange'/);
+    assert.match(entrypoint, /addEventListener\('controllerchange'/);
+    assert.match(entrypoint, /window\.location\.reload\(\)/);
+});

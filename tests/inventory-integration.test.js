@@ -80,7 +80,10 @@ test('Inventory React and API integrate with isolated SQLite', async () => {
         assert.equal(database.prepare("SELECT COUNT(*) AS count FROM inventory_history WHERE waybill = 'RETENTION-RECENT'").get().count, 1);
 
         browser = await chromium.launch({ headless: true });
-        const operatorContext = await browser.newContext();
+        const operatorContext = await browser.newContext({
+            viewport: { width: 390, height: 844 },
+            hasTouch: true,
+        });
         contexts.push(operatorContext);
         await operatorContext.addInitScript(() => {
             window.__clipboardValue = '';
@@ -142,7 +145,7 @@ test('Inventory React and API integrate with isolated SQLite', async () => {
         assert.equal(operatorRecord.creator_username, 'phase95.operator');
         assert.equal(operatorRecord.created_by_user_id, operatorId);
         assert.equal(inventoryRequests[0].waybill, 'WB-95-OPERATOR-1');
-        await operatorPage.mouse.click(5, 5);
+        await operatorPage.touchscreen.tap(5, 5);
         await operatorPage.locator('.inventory-dialog[open]').waitFor({ state: 'hidden' });
 
         await operatorPage.evaluate(() => {

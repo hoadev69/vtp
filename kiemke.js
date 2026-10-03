@@ -9,12 +9,6 @@ const operatorActions = document.getElementById('operatorActions');
 const qrDialog = document.getElementById('qrDialog');
 const qrImage = document.getElementById('qrImage');
 
-function isDialogBackdropClick(event) {
-    if (event.target !== event.currentTarget) return false;
-    const { bottom, left, right, top } = event.currentTarget.getBoundingClientRect();
-    return event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom;
-}
-
 function showLogin(error = '') {
     loginPanel.hidden = false;
     createPanel.hidden = true;
@@ -83,7 +77,7 @@ document.getElementById('closeAccountLocked').addEventListener('click', () => {
 });
 
 document.getElementById('accountLockedDialog').addEventListener('click', event => {
-    if (isDialogBackdropClick(event)) event.currentTarget.close();
+    if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
 document.getElementById('operatorLogout').addEventListener('click', async () => {
@@ -134,7 +128,7 @@ createQrButton.addEventListener('click', async () => {
 
 document.getElementById('closeQrDialog').addEventListener('click', () => qrDialog.close());
 qrDialog.addEventListener('click', event => {
-    if (isDialogBackdropClick(event)) qrDialog.close();
+    if (event.target === qrDialog) qrDialog.close();
 });
 qrDialog.addEventListener('close', () => {
     qrImage.removeAttribute('src');
