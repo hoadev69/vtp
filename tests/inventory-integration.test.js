@@ -142,7 +142,8 @@ test('Inventory React and API integrate with isolated SQLite', async () => {
         assert.equal(operatorRecord.creator_username, 'phase95.operator');
         assert.equal(operatorRecord.created_by_user_id, operatorId);
         assert.equal(inventoryRequests[0].waybill, 'WB-95-OPERATOR-1');
-        await operatorPage.getByRole('button', { name: 'Đóng' }).click();
+        await operatorPage.mouse.click(5, 5);
+        await operatorPage.locator('.inventory-dialog[open]').waitFor({ state: 'hidden' });
 
         await operatorPage.evaluate(() => {
             window.__clipboardValue = 'WB-95-DOUBLE-SUBMIT';

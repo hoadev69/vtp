@@ -195,6 +195,15 @@ test('VTP system acceptance integrates React, Express, registry, Admin, Inventor
         await page.getByRole('button', { name: 'In lại tem' }).click();
         const reprintDialog = page.getByRole('dialog', { name: 'Xác nhận in lại tem' });
         await reprintDialog.getByText('LEGACY-AMBIG-97').waitFor();
+        await page.mouse.click(5, 5);
+        await reprintDialog.waitFor({ state: 'hidden' });
+        assert.equal(historyPostRequests.length, historyPostsBeforeReprint);
+        await page.locator('.admin-order-dialog[open]').waitFor({ state: 'hidden' });
+        await page.getByRole('button', { name: 'Xem chi tiết' }).first().click();
+        const orderDetailDialog = page.getByRole('dialog', { name: 'LEGACY-AMBIG-97' });
+        await orderDetailDialog.waitFor();
+        await page.getByRole('button', { name: 'In lại tem' }).click();
+        await reprintDialog.getByText('LEGACY-AMBIG-97').waitFor();
         await reprintDialog.getByRole('button', { name: 'In lại tem' }).click();
         await page.getByRole('heading', { name: 'Tem vận chuyển' }).waitFor();
         assert.equal(historyPostRequests.length, historyPostsBeforeReprint);

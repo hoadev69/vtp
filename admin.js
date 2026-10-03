@@ -23,6 +23,20 @@ const inventoryAccountSearch = document.getElementById('inventoryAccountSearch')
 const inventoryAccountRoleFilter = document.getElementById('inventoryAccountRoleFilter');
 const inventoryAccountStatusFilter = document.getElementById('inventoryAccountStatusFilter');
 const anonymousUserSearch = document.getElementById('anonymousUserSearch');
+
+function isDialogBackdropClick(event) {
+    if (event.target !== event.currentTarget) return false;
+    const { bottom, left, right, top } = event.currentTarget.getBoundingClientRect();
+    return event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom;
+}
+
+for (const id of ['accountLockedDialog', 'createdCodesDialog']) {
+    const dialog = document.getElementById(id);
+    dialog.addEventListener('click', event => {
+        if (isDialogBackdropClick(event)) dialog.close();
+    });
+}
+
 let currentPage = 1;
 let totalPages = 1;
 let inventoryAccountCurrentPage = 1;
@@ -354,7 +368,7 @@ document.getElementById('closeRecreateCode').addEventListener('click', () => {
 });
 
 document.getElementById('recreateCodeDialog').addEventListener('click', event => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
+    if (isDialogBackdropClick(event)) event.currentTarget.close();
 });
 
 document.getElementById('confirmRecreateCode').addEventListener('click', event => {
@@ -389,7 +403,7 @@ confirmDialogCancelButton.addEventListener('click', () => resolveConfirmDialog(f
 confirmDialogConfirmButton.addEventListener('click', () => resolveConfirmDialog(true));
 confirmDialog.addEventListener('cancel', () => resolveConfirmDialog(false));
 confirmDialog.addEventListener('click', event => {
-    if (event.target === event.currentTarget) resolveConfirmDialog(false);
+    if (isDialogBackdropClick(event)) resolveConfirmDialog(false);
 });
 confirmDialog.addEventListener('close', () => {
     resolveConfirmDialog(false);
@@ -478,7 +492,7 @@ document.getElementById('closeIpHistory').addEventListener('click', () => {
 });
 
 document.getElementById('ipHistoryDialog').addEventListener('click', event => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
+    if (isDialogBackdropClick(event)) event.currentTarget.close();
 });
 
 document.getElementById('previousIpHistoryPage').addEventListener('click', () => {
@@ -1075,14 +1089,14 @@ document.getElementById('createInventoryAccountButton').addEventListener('click'
 
 document.getElementById('closeInventoryAccountCreate').addEventListener('click', () => inventoryAccountCreateDialog.close());
 inventoryAccountCreateDialog.addEventListener('click', event => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
+    if (isDialogBackdropClick(event)) event.currentTarget.close();
 });
 
 const closeInventoryAccountRoleDialog = () => inventoryAccountRoleDialog.close();
 document.getElementById('closeInventoryAccountRole').addEventListener('click', closeInventoryAccountRoleDialog);
 document.getElementById('cancelInventoryAccountRole').addEventListener('click', closeInventoryAccountRoleDialog);
 inventoryAccountRoleDialog.addEventListener('click', event => {
-    if (event.target === event.currentTarget) closeInventoryAccountRoleDialog();
+    if (isDialogBackdropClick(event)) closeInventoryAccountRoleDialog();
 });
 
 inventoryAccountRoleForm.addEventListener('submit', async event => {
@@ -1159,7 +1173,7 @@ document.getElementById('inventoryAccountForm').addEventListener('submit', async
 
 document.getElementById('closeLockInventoryAccount').addEventListener('click', () => lockInventoryAccountDialog.close());
 lockInventoryAccountDialog.addEventListener('click', event => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
+    if (isDialogBackdropClick(event)) event.currentTarget.close();
 });
 document.getElementById('lockInventoryAccountForm').addEventListener('submit', async event => {
     event.preventDefault();
@@ -1196,7 +1210,7 @@ document.getElementById('lockInventoryAccountForm').addEventListener('submit', a
 
 document.getElementById('closeResetInventoryPassword').addEventListener('click', () => resetInventoryPasswordDialog.close());
 resetInventoryPasswordDialog.addEventListener('click', event => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
+    if (isDialogBackdropClick(event)) event.currentTarget.close();
 });
 document.getElementById('resetInventoryPasswordForm').addEventListener('submit', async event => {
     event.preventDefault();
@@ -1337,7 +1351,7 @@ document.getElementById('closeInventoryOrders').addEventListener('click', () => 
 });
 
 document.getElementById('inventoryOrdersDialog').addEventListener('click', event => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
+    if (isDialogBackdropClick(event)) event.currentTarget.close();
 });
 document.getElementById('inventoryOrdersDialog').addEventListener('close', () => {
     activeInventoryAccountId = null;
@@ -1358,7 +1372,7 @@ document.getElementById('closeInventoryOrderQr').addEventListener('click', () =>
 });
 
 document.getElementById('inventoryOrderQrDialog').addEventListener('click', event => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
+    if (isDialogBackdropClick(event)) event.currentTarget.close();
 });
 
 document.getElementById('inventoryOrderQrDialog').addEventListener('close', () => {
@@ -1904,7 +1918,7 @@ addAddressDialog.addEventListener('cancel', event => {
     if (addAddressSaveInFlight) event.preventDefault();
 });
 addAddressDialog.addEventListener('click', event => {
-    if (!addAddressSaveInFlight && event.target === event.currentTarget) addAddressDialog.close();
+    if (!addAddressSaveInFlight && isDialogBackdropClick(event)) addAddressDialog.close();
 });
 addAddressType.addEventListener('change', updateAddAddressFields);
 addAddressDistrict.addEventListener('change', updateAddressCommuneOptions);

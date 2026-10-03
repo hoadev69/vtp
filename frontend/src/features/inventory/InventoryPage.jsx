@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ApiError, apiRequest } from '../../shared/api/client.js';
+import { isDialogBackdropClick } from '../../shared/components/dialogUtils.js';
 import InputControl from '../../shared/components/InputControl.jsx';
 import './inventory.css';
 
@@ -234,6 +235,7 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
 
             <dialog
                 className="inventory-dialog"
+                onClick={event => { if (isDialogBackdropClick(event)) event.currentTarget.close(); }}
                 onClose={() => setQrResult(null)}
                 ref={qrDialogRef}
                 aria-labelledby="inventory-qr-title"
@@ -255,6 +257,7 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
 
             <dialog
                 className="inventory-dialog inventory-dialog--locked"
+                onClick={event => { if (isDialogBackdropClick(event)) event.currentTarget.close(); }}
                 onClose={() => setLockedReason('')}
                 ref={lockedDialogRef}
                 aria-labelledby="inventory-locked-title"

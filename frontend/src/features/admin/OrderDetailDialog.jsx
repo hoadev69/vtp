@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { isDialogBackdropClick } from '../../shared/components/dialogUtils.js';
 
 const fieldLabels = { nhapTen: 'Người nhận', nhapSdt: 'Số điện thoại', soHang: 'Số hàng', tenHang: 'Tên hàng' };
 
@@ -19,6 +20,8 @@ export default function OrderDetailDialog({ order, onClose, onPrintAgain }) {
         if (order) {
             setIsClosing(false);
             if (!dialog.open) dialog.showModal();
+        } else if (dialog.open) {
+            dialog.close();
         }
     }, [order]);
 
@@ -55,7 +58,7 @@ export default function OrderDetailDialog({ order, onClose, onPrintAgain }) {
         <dialog aria-labelledby="admin-order-detail-title" className="admin-order-dialog" onClose={onClose}
             data-closing={isClosing || undefined}
             onCancel={event => { event.preventDefault(); closeDialog(); }}
-            onClick={event => { if (event.target === event.currentTarget) closeDialog(); }} ref={dialogRef}>
+            onClick={event => { if (isDialogBackdropClick(event)) closeDialog(); }} ref={dialogRef}>
             {order && (
                 <>
                     <header className="admin-order-dialog__header">

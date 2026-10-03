@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react';
+import { isDialogBackdropClick } from './dialogUtils.js';
 
 export default function AdminDialog({
     open,
@@ -31,7 +32,7 @@ export default function AdminDialog({
             aria-labelledby={titleId}
             className={`admin-dialog admin-dialog--${size}`}
             onCancel={event => { event.preventDefault(); closeDialog(); }}
-            onClick={event => { if (event.target === event.currentTarget) closeDialog(); }}
+            onClick={event => { if (isDialogBackdropClick(event)) closeDialog(); }}
             ref={dialogRef}
         >
             <header className="admin-dialog__header">
