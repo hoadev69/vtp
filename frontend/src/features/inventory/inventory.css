@@ -92,8 +92,31 @@
 .inventory-workspace {
     display: grid;
     justify-items: center;
+    align-content: center;
     gap: var(--space-5);
     padding-block: clamp(var(--space-8), 10vh, var(--space-16));
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    text-align: center;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.inventory-workspace--dragging {
+    border-color: var(--color-primary);
+    background: var(--color-surface-hover);
+}
+
+.inventory-page__drop-hint,
+.inventory-page__drop-hint-secondary {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-body-small);
+    line-height: 1.5;
+}
+
+.inventory-page__drop-hint {
+    color: var(--color-text);
+    font-weight: 700;
 }
 
 .inventory-page__create {

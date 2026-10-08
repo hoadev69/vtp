@@ -17,6 +17,11 @@ function publishAuthChange(role, username = '') {
     }));
 }
 
+function isDraggedUrl(value) {
+    return /^(?:(?:https?|ftp):\/\/|www\.)/i.test(value)
+        || /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]|$)/i.test(value);
+}
+
 export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
     const [view, setView] = useState('checking');
     const [loginUsername, setLoginUsername] = useState('');
@@ -24,6 +29,7 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
     const [loginMessage, setLoginMessage] = useState('');
     const [loginError, setLoginError] = useState('');
     const [pageError, setPageError] = useState('');
+    const [isDragging, setIsDragging] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [qrResult, setQrResult] = useState(null);
@@ -123,17 +129,14 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
         }
     }
 
-    async function createQrFromClipboard() {
+    async function createQrFromWaybill(getWaybill) {
         if (createInFlight.current) return;
         createInFlight.current = true;
         setPageError('');
         setIsCreating(true);
         try {
-            if (!navigator.clipboard?.readText) {
-                throw new Error('Trình duyệt không hỗ trợ đọc clipboard trên kết nối này.');
-            }
-            const waybill = (await navigator.clipboard.readText()).trim();
-            if (!waybill) throw new Error('Clipboard đang trống.');
+            const waybill = (await getWaybill()).trim();
+            if (!waybill) throw new Error('Mã vận đơn không được để trống.');
 
             const result = await apiRequest('/api/kiemke', {
                 method: 'POST',
@@ -157,6 +160,41 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
             createInFlight.current = false;
             setIsCreating(false);
         }
+    }
+
+    async function createQrFromClipboard() {
+        await createQrFromWaybill(async () => {
+            if (!navigator.clipboard?.readText) {
+                throw new Error('Trình duyệt không hỗ trợ đọc clipboard trên kết nối này.');
+            }
+            const waybill = await navigator.clipboard.readText();
+            if (!waybill.trim()) throw new Error('Clipboard đang trống.');
+            return waybill;
+        });
+    }
+
+    function handleDrop(event) {
+        event.preventDefault();
+        setIsDragging(false);
+
+        const transfer = event.dataTransfer;
+        const plainText = transfer?.getData('text/plain')?.trim() || '';
+        const uriList = transfer?.getData('text/uri-list')
+            ?.split(/\r?\n/)
+            .find(line => line.trim() && !line.trim().startsWith('#'))
+            ?.trim() || '';
+        const waybill = plainText || uriList;
+
+        if (!waybill) {
+            setPageError('Không tìm thấy mã vận đơn trong dữ liệu được thả.');
+            return;
+        }
+        if (isDraggedUrl(waybill)) {
+            setPageError('Dữ liệu được thả là liên kết, không phải mã vận đơn.');
+            return;
+        }
+
+        void createQrFromWaybill(() => waybill);
     }
 
     const isAuthenticated = view === 'inventory';
@@ -217,9 +255,29 @@ export default function InventoryPage({ authUser, authStatus, onRetryAuth }) {
                 </form>
             )}
             {isAuthenticated && (
-                <div className="inventory-workspace">
+                <div
+                    aria-label="Khu vực thả mã vận đơn để tạo QR"
+                    className={`inventory-workspace${isDragging ? ' inventory-workspace--dragging' : ''}`}
+                    onDragEnter={event => {
+                        event.preventDefault();
+                        setIsDragging(true);
+                    }}
+                    onDragOver={event => {
+                        event.preventDefault();
+                        setIsDragging(true);
+                    }}
+                    onDragLeave={event => {
+                        const nextTarget = event.relatedTarget;
+                        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) setIsDragging(false);
+                    }}
+                    onDrop={handleDrop}
+                >
                     {pageError && <p className="inventory-page__error" role="alert">{pageError}</p>}
                     {!qrResult && <p className="inventory-page__state" role="status">Chưa có mã QR mới trong phiên này.</p>}
+                    <p className="inventory-page__drop-hint">
+                        {isDragging ? 'Có thể thả mã vận đơn vào đây' : 'Kéo mã vận đơn vào đây để tạo QR'}
+                    </p>
+                    <p className="inventory-page__drop-hint-secondary">Hoặc dán mã từ clipboard</p>
                 </div>
             )}
             {isAuthenticated && createPortal(

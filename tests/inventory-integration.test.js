@@ -148,6 +148,67 @@ test('Inventory React and API integrate with isolated SQLite', async () => {
         await operatorPage.touchscreen.tap(5, 5);
         await operatorPage.locator('.inventory-dialog[open]').waitFor({ state: 'hidden' });
 
+        inventoryRequests.length = 0;
+        const dropZone = operatorPage.locator('.inventory-workspace');
+        const acceptedDrag = await operatorPage.evaluate(() => {
+            const zone = document.querySelector('.inventory-workspace');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', '  WB-95-DROP-1  ');
+            const dragenter = new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer });
+            zone.dispatchEvent(dragenter);
+            const dragover = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer });
+            zone.dispatchEvent(dragover);
+            return { dragenterPrevented: dragenter.defaultPrevented, dragoverPrevented: dragover.defaultPrevented };
+        });
+        assert.deepEqual(acceptedDrag, { dragenterPrevented: true, dragoverPrevented: true });
+        assert.equal(await dropZone.evaluate(zone => zone.classList.contains('inventory-workspace--dragging')), true);
+        assert.match(await dropZone.textContent(), /Có thể thả mã vận đơn vào đây/);
+
+        const dropPrevented = await operatorPage.evaluate(() => {
+            const zone = document.querySelector('.inventory-workspace');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', '  WB-95-DROP-1  ');
+            const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer });
+            zone.dispatchEvent(drop);
+            return drop.defaultPrevented;
+        });
+        assert.equal(dropPrevented, true);
+        await qrImage.waitFor();
+        assert.equal(await operatorPage.locator('.inventory-dialog__waybill').textContent(), 'WB-95-DROP-1');
+        assert.equal(inventoryRequests.length, 1);
+        assert.equal(inventoryRequests[0].waybill, 'WB-95-DROP-1');
+        await operatorPage.getByRole('button', { name: 'Đóng' }).click();
+
+        await operatorPage.evaluate(() => {
+            const zone = document.querySelector('.inventory-workspace');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', 'https://example.com/waybill');
+            zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+        });
+        await dropZone.getByRole('alert').filter({ hasText: 'không phải mã vận đơn' }).waitFor();
+        assert.equal(inventoryRequests.length, 1);
+
+        await operatorPage.evaluate(() => {
+            const zone = document.querySelector('.inventory-workspace');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', '   ');
+            zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+        });
+        await dropZone.getByRole('alert').filter({ hasText: 'Không tìm thấy mã vận đơn' }).waitFor();
+        assert.equal(inventoryRequests.length, 1);
+
+        await operatorPage.evaluate(() => {
+            const zone = document.querySelector('.inventory-workspace');
+            const dataTransfer = new DataTransfer();
+            dataTransfer.setData('text/plain', 'WB-95-DROP-2');
+            zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+        });
+        await qrImage.waitFor();
+        assert.equal(await operatorPage.locator('.inventory-dialog__waybill').textContent(), 'WB-95-DROP-2');
+        assert.equal(inventoryRequests.length, 2);
+        assert.equal(inventoryRequests[1].waybill, 'WB-95-DROP-2');
+        await operatorPage.getByRole('button', { name: 'Đóng' }).click();
+
         await operatorPage.evaluate(() => {
             window.__clipboardValue = 'WB-95-DOUBLE-SUBMIT';
             window.__clipboardReadCount = 0;
