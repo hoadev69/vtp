@@ -162,7 +162,9 @@
 
 .order-submit:disabled {
     cursor: not-allowed;
-    opacity: 0.58;
+    border-color: var(--color-border);
+    background: var(--color-surface-disabled);
+    color: var(--color-text-disabled);
 }
 
 .order-error {

@@ -193,13 +193,18 @@ button:not(.view-tab) {
 }
 button:not(.view-tab):hover:not(:disabled) { border-color: var(--color-border-hover); background: var(--color-control-hover-surface); }
 button[data-edit-group][aria-pressed="true"] { border-color: var(--green); background: var(--color-surface-selected); color: var(--green-dark); }
-button:disabled { cursor: default; opacity: .45; }
+button:disabled {
+    border-color: var(--color-border);
+    background: var(--color-surface-disabled);
+    color: var(--color-text-disabled);
+    cursor: not-allowed;
+}
 .form-hint { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
 .error-message { margin: 0 0 12px; color: var(--color-danger); font-size: 13px; }
-.success-message { margin: 0 0 12px; color: var(--green-dark); font-size: 13px; }
+.success-message { margin: 0 0 12px; color: var(--color-success); font-size: 13px; }
 .ip-status { font-weight: 700; }
 .ip-status.blocked { color: var(--warning); }
-.visibility-status { color: var(--green-dark); font-weight: 700; }
+.visibility-status { color: var(--color-success); font-weight: 700; }
 .visibility-status.hidden { color: var(--warning); }
 .ip-label { width: min(220px, 100%); }
 .ip-label:disabled { background: var(--color-surface-disabled); color: var(--muted); }
@@ -208,7 +213,7 @@ button:disabled { cursor: default; opacity: .45; }
 .recreate-entry-button { min-height: 30px !important; padding: 4px 8px !important; }
 .ip-actions, .geography-actions { display: flex; gap: 6px; white-space: nowrap; }
 .ip-actions .block-button, .geography-actions .delete-button { color: var(--warning); }
-.ip-actions .unblock-button { color: var(--green-dark); }
+.ip-actions .unblock-button { color: var(--color-success); }
 #ipRows tr { transition: background-color 140ms ease; }
 #ipRows tr[data-blocked="true"] { background: var(--color-surface-danger); }
 #ipRows tr[data-blocked="true"] td:first-child { border-inline-start: 3px solid var(--color-danger); }

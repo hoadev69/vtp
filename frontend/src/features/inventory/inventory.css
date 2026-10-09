@@ -86,7 +86,14 @@
 .inventory-page__primary:disabled,
 .inventory-page__secondary:disabled {
     cursor: wait;
-    opacity: .65;
+    border-color: var(--color-border);
+    color: var(--color-text-disabled);
+    background: var(--color-surface-disabled);
+}
+
+.inventory-page__primary:active:not(:disabled) {
+    border-color: var(--color-primary-active);
+    background: var(--color-primary-active);
 }
 
 .inventory-workspace {

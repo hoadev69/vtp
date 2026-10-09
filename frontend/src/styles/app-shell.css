@@ -163,7 +163,8 @@
 
 .navigation__logout:disabled {
     cursor: wait;
-    opacity: .65;
+    color: var(--color-brand-muted);
+    opacity: 1;
 }
 
 .navigation__logout-error {

@@ -61,7 +61,12 @@ button {
     cursor: pointer;
 }
 button:hover:not(:disabled) { border-color: var(--green-dark); background: var(--green-dark); }
-button:disabled { cursor: wait; opacity: .65; }
+button:disabled {
+    border-color: var(--color-border);
+    background: var(--color-surface-disabled);
+    color: var(--color-text-disabled);
+    cursor: wait;
+}
 .clipboard-button { display: block; width: min(100%, 320px); margin: 0 auto; }
 .error-message { margin: 12px 0 0; color: var(--color-danger); font-size: 13px; }
 #formError { text-align: center; }
