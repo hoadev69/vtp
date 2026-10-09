@@ -62,14 +62,16 @@
 
 .app-navigation__link[aria-current="page"],
 .bottom-navigation__link[aria-current="page"] {
-    border-color: var(--color-brand-border);
-    background: rgb(255 255 255 / 10%);
-    color: var(--color-brand-text);
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
 }
 
-.app-navigation__link:hover,
-.bottom-navigation__link:hover {
-    color: var(--color-brand-text);
+.app-navigation__link:hover:not([aria-current="page"]),
+.bottom-navigation__link:hover:not([aria-current="page"]) {
+    border-color: var(--color-brand-border);
+    background: var(--color-brand-hover);
+    color: var(--color-primary-text);
 }
 
 .app-navigation__link:focus-visible,
@@ -157,8 +159,9 @@
 }
 
 .navigation__logout:hover:not(:disabled) {
-    border-color: var(--color-brand-muted);
-    background: rgb(255 255 255 / 10%);
+    border-color: var(--color-primary);
+    background: var(--color-brand-hover);
+    color: var(--color-primary-text);
 }
 
 .navigation__logout:disabled {
@@ -200,8 +203,9 @@
 }
 
 .app-navigation__theme:hover {
-    background: rgb(255 255 255 / 10%);
-    border-color: var(--color-brand-muted);
+    background: var(--color-brand-hover);
+    border-color: var(--color-primary);
+    color: var(--color-primary-text);
 }
 
 .app-navigation__theme > span:first-child {

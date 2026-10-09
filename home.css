@@ -37,15 +37,15 @@
     --color-info: #28617a;
     --color-focus-ring: #a91d2d;
     --color-overlay: rgb(20 22 25 / 52%);
-    --color-brand-surface: #3a3436;
-    --color-brand-accent: #ff747d;
-    --color-brand-text: #fff;
-    --color-brand-text-secondary: #e7e2e3;
-    --color-brand-muted: #d0c7c9;
-    --color-brand-hover: #f7e8ea;
-    --color-brand-border: #91898c;
-    --color-brand-pending: #f0d28f;
-    --color-brand-error: #ffb5a4;
+    --color-brand-surface: #fff;
+    --color-brand-accent: #c62828;
+    --color-brand-text: #202124;
+    --color-brand-text-secondary: #555b63;
+    --color-brand-muted: #636a72;
+    --color-brand-hover: #fbe9eb;
+    --color-brand-border: #bcc2c8;
+    --color-brand-pending: #8a4b00;
+    --color-brand-error: #a32626;
     --color-metric-alert: #b14a32;
     --color-control-hover-surface: #f4eeee;
 
@@ -712,8 +712,8 @@ body:has(dialog[open]) { overflow: hidden; }
     white-space: nowrap;
     transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
 }
-.vtp-nav-link:hover { border-color: var(--color-brand-border); background: rgb(255 255 255 / 8%); color: var(--color-brand-text); }
-.vtp-nav-link.is-active { border-color: var(--color-brand-border); background: rgb(255 255 255 / 12%); color: var(--color-brand-text); }
+.vtp-nav-link:hover:not(.is-active) { border-color: var(--color-brand-border); background: var(--color-brand-hover); color: var(--color-primary-text); }
+.vtp-nav-link.is-active { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
 .vtp-theme-toggle {
     display: inline-grid;
     place-items: center;
@@ -727,7 +727,7 @@ body:has(dialog[open]) { overflow: hidden; }
     color: var(--color-brand-text) !important;
     font-size: 18px !important;
 }
-.vtp-theme-toggle:hover:not(:disabled) { background: rgb(255 255 255 / 12%) !important; }
+.vtp-theme-toggle:hover:not(:disabled) { border-color: var(--color-primary) !important; background: var(--color-brand-hover) !important; color: var(--color-primary-text) !important; }
 .topbar[data-vtp-navigation] .brand { color: var(--color-brand-accent); }
 .topbar [data-vtp-nav-links] { gap: 5px; }
 .topbar .vtp-nav-link { min-height: 38px; padding-inline: 10px; }
@@ -747,7 +747,7 @@ body:has(dialog[open]) { overflow: hidden; }
     white-space: nowrap;
 }
 .vtp-global-nav__account button:hover:not(:disabled),
-.vtp-nav-logout:hover:not(:disabled) { background: rgb(255 255 255 / 12%); }
+.vtp-nav-logout:hover:not(:disabled) { border-color: var(--color-primary); background: var(--color-brand-hover); color: var(--color-primary-text); }
 
 .vtp-clearable-input { position: relative; display: block; width: 100%; min-width: 0; }
 .vtp-clearable-input > input,

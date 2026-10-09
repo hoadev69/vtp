@@ -37,15 +37,15 @@
     --color-info: #28617a;
     --color-focus-ring: #a91d2d;
     --color-overlay: rgb(20 22 25 / 52%);
-    --color-brand-surface: #3a3436;
-    --color-brand-accent: #ff747d;
-    --color-brand-text: #fff;
-    --color-brand-text-secondary: #e7e2e3;
-    --color-brand-muted: #d0c7c9;
-    --color-brand-hover: #f7e8ea;
-    --color-brand-border: #91898c;
-    --color-brand-pending: #f0d28f;
-    --color-brand-error: #ffb5a4;
+    --color-brand-surface: #fff;
+    --color-brand-accent: #c62828;
+    --color-brand-text: #202124;
+    --color-brand-text-secondary: #555b63;
+    --color-brand-muted: #636a72;
+    --color-brand-hover: #fbe9eb;
+    --color-brand-border: #bcc2c8;
+    --color-brand-pending: #8a4b00;
+    --color-brand-error: #a32626;
     --color-metric-alert: #b14a32;
     --color-control-hover-surface: #f4eeee;
 
