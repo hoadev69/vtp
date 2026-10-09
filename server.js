@@ -1242,6 +1242,34 @@ app.put('/api/admin/users/:id/password', requireAdmin, (req, res) => {
     res.sendStatus(204);
 });
 
+app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) {
+        return res.status(400).json({ error: 'Mã tài khoản không hợp lệ.' });
+    }
+
+    const error = database.transaction(() => {
+        const target = database.prepare('SELECT id, role, active FROM users WHERE id = ?').get(id);
+        if (!target) return { status: 404, message: 'Không tìm thấy tài khoản.' };
+        if (id === req.authUser.id) {
+            return { status: 409, message: 'Không thể xóa tài khoản đang đăng nhập.' };
+        }
+        if (target.role === 'admin' && target.active) {
+            const activeAdmins = database.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND active = 1").get().count;
+            if (activeAdmins <= 1) {
+                return { status: 409, message: 'Không thể xóa Admin cuối cùng đang hoạt động.' };
+            }
+        }
+
+        revokeInventorySessions(id);
+        database.prepare('DELETE FROM users WHERE id = ?').run(id);
+        return null;
+    }).immediate();
+
+    if (error) return res.status(error.status).json({ error: error.message });
+    res.sendStatus(204);
+});
+
 app.get('/api/admin/inventory-accounts', requireAdmin, (req, res) => {
     pruneGeneratedCodeHistory();
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);

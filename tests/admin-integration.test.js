@@ -72,6 +72,7 @@ test('Admin APIs integrate with isolated SQLite for auth, history, users, geogra
         assert.equal(guestHistory.status, 401);
         const guestUsers = await request('/api/admin/users');
         assert.equal(guestUsers.status, 401);
+        assert.equal((await request('/api/admin/users/1', { method: 'DELETE' })).status, 401);
 
         const adminLogin = await login('/api/login', 'phase94.admin', 'phase94-admin-password');
         assert.equal(adminLogin.response.status, 200);
@@ -96,6 +97,9 @@ test('Admin APIs integrate with isolated SQLite for auth, history, users, geogra
         const operatorCookie = operatorLogin.cookie;
         assert.equal((await request('/api/admin/history', { cookie: operatorCookie })).status, 403);
         assert.equal((await request('/api/admin/users', { cookie: operatorCookie })).status, 403);
+        assert.equal((await request('/api/admin/users/1', { method: 'DELETE', cookie: operatorCookie })).status, 403);
+        assert.equal((await request('/api/admin/users/not-an-id', { method: 'DELETE', cookie: adminCookie })).status, 400);
+        assert.equal((await request('/api/admin/users/999999', { method: 'DELETE', cookie: adminCookie })).status, 404);
 
         const firstPage = await readJson(await request('/api/admin/history?page=1', { cookie: adminCookie }));
         const secondPage = await readJson(await request('/api/admin/history?page=2', { cookie: adminCookie }));
@@ -138,6 +142,8 @@ test('Admin APIs integrate with isolated SQLite for auth, history, users, geogra
         assert.equal((await request('/api/admin/users/1/status', {
             method: 'PATCH', cookie: adminCookie, body: { active: false, reason: 'self lock check' },
         })).status, 409);
+        const adminId = database.prepare("SELECT id FROM users WHERE username = 'phase94.admin'").get().id;
+        assert.equal((await request(`/api/admin/users/${adminId}`, { method: 'DELETE', cookie: adminCookie })).status, 409);
 
         const lockedAccountResponse = await request('/api/admin/users', {
             method: 'POST', cookie: adminCookie,
@@ -169,6 +175,37 @@ test('Admin APIs integrate with isolated SQLite for auth, history, users, geogra
         const unlockedLogin = await login('/api/kiemke/login', lockedAccount.username, 'phase94-locked-password');
         assert.equal(unlockedLogin.response.status, 200);
         assert.equal((await request('/api/kiemke/me', { cookie: unlockedLogin.cookie })).status, 200);
+
+        const deletableResponse = await request('/api/admin/users', {
+            method: 'POST', cookie: adminCookie,
+            body: { username: 'phase94-delete-me', password: 'phase94-delete-password', role: 'operator' },
+        });
+        assert.equal(deletableResponse.status, 201);
+        const deletableAccount = await readJson(deletableResponse);
+        const deletableLogin = await login('/api/kiemke/login', deletableAccount.username, 'phase94-delete-password');
+        assert.equal(deletableLogin.response.status, 200);
+        const deletableSessionCookie = deletableLogin.cookie.split('; ')
+            .find(value => value.startsWith('vtp.sid='));
+        const deletableSessionId = decodeURIComponent(deletableSessionCookie.slice('vtp.sid='.length)).slice(2).split('.', 1)[0];
+        assert.ok(database.prepare('SELECT sid FROM sessions WHERE sid = ?').get(deletableSessionId));
+        database.prepare(`
+            INSERT INTO inventory_history (ip, waybill, creator_username, created_at, created_by_user_id)
+            VALUES (?, ?, ?, ?, ?)
+        `).run('203.0.113.94', 'DELETE-ACCOUNT-HISTORY', deletableAccount.username, createdAt, deletableAccount.id);
+        const deletedAccountResponse = await request(`/api/admin/users/${deletableAccount.id}`, {
+            method: 'DELETE', cookie: adminCookie,
+        });
+        assert.equal(deletedAccountResponse.status, 204);
+        assert.equal(database.prepare('SELECT id FROM users WHERE id = ?').get(deletableAccount.id), undefined);
+        assert.equal(database.prepare('SELECT sid FROM sessions WHERE sid = ?').get(deletableSessionId), undefined);
+        assert.equal((await request('/api/kiemke/me', { cookie: deletableLogin.cookie })).status, 401);
+        assert.equal(database.prepare('SELECT COUNT(*) AS count FROM inventory_sessions WHERE user_id = ?').get(deletableAccount.id).count, 0);
+        const retainedHistory = database.prepare('SELECT waybill, creator_username, created_by_user_id FROM inventory_history WHERE waybill = ?').get('DELETE-ACCOUNT-HISTORY');
+        assert.deepEqual(retainedHistory, {
+            waybill: 'DELETE-ACCOUNT-HISTORY',
+            creator_username: 'phase94-delete-me',
+            created_by_user_id: null,
+        });
 
         const districtCreate = await request('/api/admin/districts', {
             method: 'POST', cookie: adminCookie, body: { name: 'Phase94 Address District', kind: 'district' },

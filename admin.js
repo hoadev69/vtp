@@ -675,6 +675,13 @@ async function loadInventoryAccounts() {
             passwordButton.dataset.accountAction = 'password';
             passwordButton.textContent = 'Đặt mật khẩu';
             actions.append(passwordButton);
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.dataset.accountAction = 'delete';
+            deleteButton.className = 'account-delete-button';
+            deleteButton.disabled = account.username === document.getElementById('adminName').textContent;
+            deleteButton.textContent = 'Xóa';
+            actions.append(deleteButton);
             row.append(actions);
             inventoryAccountRows.append(row);
         }
@@ -1259,6 +1266,41 @@ inventoryAccountRows.addEventListener('click', async event => {
     if (!button) return;
     const row = button.closest('tr[data-account-id]');
     const accountId = row.dataset.accountId;
+
+    if (button.dataset.accountAction === 'delete') {
+        const confirmed = await confirmAction({
+            title: 'Xác nhận xóa tài khoản',
+            message: `Xóa vĩnh viễn tài khoản "${row.dataset.username}"? Các phiên đăng nhập sẽ bị thu hồi. Lịch sử mã đã tạo vẫn được giữ lại.`,
+            confirmLabel: 'Xóa tài khoản',
+            danger: true,
+        });
+        if (!confirmed) return;
+        const isLastAccountOnPage = inventoryAccountRows.querySelectorAll('tr[data-account-id]').length === 1;
+        button.disabled = true;
+        button.dataset.loading = 'true';
+        button.textContent = 'Đang xóa...';
+        setSaveStatus('Đang xóa tài khoản...', 'pending');
+        try {
+            await api(`/api/admin/users/${accountId}`, { method: 'DELETE' });
+            if (activeInventoryAccountId === accountId) {
+                document.getElementById('inventoryOrdersDialog').close();
+                activeInventoryAccountId = null;
+            }
+            if (isLastAccountOnPage && inventoryAccountCurrentPage > 1) inventoryAccountCurrentPage -= 1;
+            setSaveStatus(`Đã xóa tài khoản ${row.dataset.username}`);
+            await loadInventoryAccounts();
+        } catch (error) {
+            if (isAdminRequestInterruption(error)) return;
+            setSaveStatus('Lỗi xóa tài khoản', 'error');
+            inventoryAccountsError.textContent = error.message;
+            inventoryAccountsError.hidden = false;
+        } finally {
+            button.disabled = false;
+            delete button.dataset.loading;
+            button.textContent = 'Xóa';
+        }
+        return;
+    }
 
     if (button.dataset.accountAction === 'role') {
         activeRoleInventoryAccountId = accountId;

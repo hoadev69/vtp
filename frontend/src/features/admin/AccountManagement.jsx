@@ -16,6 +16,7 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [passwordAccount, setPasswordAccount] = useState(null);
     const [statusAction, setStatusAction] = useState(null);
+    const [deleteAccount, setDeleteAccount] = useState(null);
     const [statusReason, setStatusReason] = useState('');
     const [ordersAccount, setOrdersAccount] = useState(null);
     const [ordersPage, setOrdersPage] = useState(1);
@@ -190,6 +191,25 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
         }
     }
 
+    async function confirmDeleteAccount() {
+        if (!deleteAccount) return;
+        const account = deleteAccount;
+        setError('');
+        setMessage('');
+        setBusyId(account.id);
+        try {
+            await apiRequest(`/api/admin/users/${account.id}`, { method: 'DELETE' });
+            setDeleteAccount(null);
+            setMessage(`Đã xóa tài khoản ${account.username}.`);
+            setPage(current => accounts?.rows.length === 1 && current > 1 ? current - 1 : current);
+            setReload(value => value + 1);
+        } catch (requestError) {
+            if (!handleAdminAuthorizationError(requestError, onSessionExpired)) setError(getAdminErrorMessage(requestError, 'Không thể xóa tài khoản.'));
+        } finally {
+            setBusyId(null);
+        }
+    }
+
     function cancelRoleEdit() {
         setRoleDrafts(Object.fromEntries((accounts?.rows || []).map(account => [account.id, account.role])));
         setIsEditMode(false);
@@ -214,7 +234,7 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
                 </div>
             </header>
 
-            {error && !createDialogOpen && !passwordAccount && !statusAction && <p className="admin-message admin-message--error" role="alert">{error}</p>}
+            {error && !createDialogOpen && !passwordAccount && !statusAction && !deleteAccount && <p className="admin-message admin-message--error" role="alert">{error}</p>}
             {message && <p className="admin-message admin-message--success" role="status">{message}</p>}
 
             <form className="admin-management-filters" onSubmit={submitSearch}>
@@ -243,6 +263,7 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
                                 <td className="admin-management-actions" data-label="Thao tác">
                                     <button className="admin-secondary-button" disabled={isCurrentUser || Boolean(busyId)} onClick={() => toggleStatus(account)} type="button">{account.active ? 'Khóa' : 'Mở khóa'}</button>
                                     <button className="admin-secondary-button" disabled={Boolean(busyId)} onClick={() => { setError(''); setPasswordAccount(account); }} type="button">Đặt mật khẩu</button>
+                                    <button className="admin-secondary-button admin-danger-button" disabled={isCurrentUser || Boolean(busyId)} onClick={() => { setError(''); setDeleteAccount(account); }} type="button">Xóa</button>
                                 </td>
                             </tr>;
                         })}</tbody>
@@ -251,8 +272,6 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
                 <button className="admin-secondary-button" disabled={loading || page <= 1} onClick={() => setPage(value => Math.max(1, value - 1))} type="button">Trang trước</button>
                 <button className="admin-secondary-button" disabled={loading || page >= (accounts?.pages || 1)} onClick={() => setPage(value => value + 1)} type="button">Trang sau</button>
             </div></footer>
-            <p className="admin-management-note">API hiện tại không hỗ trợ xóa tài khoản.</p>
-
             <AdminDialog
                 description="Tên đăng nhập cần từ 3 đến 32 ký tự; mật khẩu tối thiểu 6 ký tự."
                 onClose={() => setCreateDialogOpen(false)}
@@ -269,6 +288,20 @@ export default function AccountManagement({ currentUser, onSessionExpired }) {
                         <button className="admin-primary-button" disabled={busyId === 'create'} type="submit">{busyId === 'create' ? 'Đang tạo...' : 'Tạo tài khoản'}</button>
                     </footer>
                 </form>
+            </AdminDialog>
+
+            <AdminDialog
+                description={deleteAccount ? `Xóa vĩnh viễn tài khoản "${deleteAccount.username}"? Các phiên đăng nhập sẽ bị thu hồi. Lịch sử mã đã tạo vẫn được giữ lại.` : ''}
+                onClose={() => setDeleteAccount(null)}
+                open={Boolean(deleteAccount)}
+                size="small"
+                title="Xác nhận xóa tài khoản"
+            >
+                {error && deleteAccount && <p className="admin-message admin-message--error" role="alert">{error}</p>}
+                <footer className="admin-dialog__actions">
+                    <button className="admin-secondary-button" disabled={busyId === deleteAccount?.id} onClick={() => setDeleteAccount(null)} type="button">Hủy</button>
+                    <button className="admin-secondary-button admin-danger-button" disabled={busyId === deleteAccount?.id} onClick={confirmDeleteAccount} type="button">{busyId === deleteAccount?.id ? 'Đang xóa...' : 'Xóa tài khoản'}</button>
+                </footer>
             </AdminDialog>
 
             <AdminDialog

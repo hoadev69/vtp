@@ -51,6 +51,7 @@ Frontend hiện gọi URL tương đối `/api/...`. Bảng dưới chỉ mô t�
 | `PATCH /api/admin/users/:id/role` | `{ role }` | `204` | Admin; `400`, `404`, hoặc `409` khi tự đổi role/ảnh hưởng admin cuối cùng ([admin.js](admin.js#L1118-L1122), [server.js](server.js#L1115-L1135)). |
 | `PATCH /api/admin/users/:id/status` | `{ active, reason? }` | `204` | Admin; khóa yêu cầu reason; có thể trả `400`, `404`, `409` ([admin.js](admin.js#L1189-L1193), [admin.js](admin.js#L1308-L1312), [server.js](server.js#L1137-L1159)). |
 | `PUT /api/admin/users/:id/password` | `{ password }` | `204` | Admin; `400` password sai, `404` không tìm thấy user ([admin.js](admin.js#L1232-L1236), [server.js](server.js#L1161-L1174)). |
+| `DELETE /api/admin/users/:id` | Không có body | `204` | Admin; `400` ID sai, `404` không tồn tại, `409` tự xóa hoặc xóa Admin hoạt động cuối cùng; thu hồi session và giữ lịch sử tạo mã. |
 | `PUT /api/admin/ips` | `{ ip, label, blocked }` | `204` | Admin; `400` input sai ([admin.js](admin.js#L1407-L1415), [server.js](server.js#L1350-L1368)). |
 | `PUT /api/admin/form-fields/:key` | `{ label, visible, defaultValue }` | `204` | Admin; `400` input sai, `404` field không tồn tại ([admin.js](admin.js#L220-L224), [server.js](server.js#L633-L652)). |
 | `POST /api/admin/districts` | `{ name, kind }` (UI gửi `kind: "district"`) | `201`: `{ id }` | Admin; `400` input sai, `409` trùng tên ([admin.js](admin.js#L1939-L1940), [server.js](server.js#L654-L671)). |

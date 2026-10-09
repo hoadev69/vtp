@@ -404,6 +404,7 @@ button:disabled { cursor: default; opacity: .45; }
 #inventoryAccountRows .account-lock-reason { display: block; max-width: 260px; margin-top: 5px; font-size: 11px; }
 #inventoryAccountRows td:last-child { min-width: 290px; }
 #inventoryAccountRows .ip-actions { gap: 7px; flex-wrap: wrap; white-space: normal; }
+#inventoryAccountRows .account-delete-button { color: var(--warning); }
 #inventoryAccountRows button[data-account-action="toggle"] {
     border-color: var(--color-success);
     background: var(--color-surface-success);
